@@ -40,11 +40,10 @@
   .label { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
 
   .search { display: flex; gap: 8px; }
-  .search input { flex: 1; min-width: 0; min-height: 52px; padding: 0 14px; font: 18px var(--f-body);
-    border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); }
-  textarea { width: 100%; min-height: 76px; margin-top: 10px; padding: 12px 14px; font: 16px/1.6 var(--f-body);
+  .search { align-items: stretch; }
+  .search textarea { flex: 1; min-width: 0; min-height: 76px; padding: 12px 14px; font: 18px/1.5 var(--f-body);
     border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); resize: vertical; }
-  input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button { font: 600 17px var(--f-body); min-height: 52px; padding: 0 20px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--accent); background: var(--accent); color: var(--sheet); touch-action: manipulation; }
   button.ghost { background: transparent; color: var(--ink); border-color: var(--rule); font-weight: 500; min-height: 44px; font-size: 15px; padding: 0 14px; }
@@ -91,24 +90,30 @@
   .sim .en { font: 600 16px var(--f-en); display: block; }
   .sim .ko { font-size: 13px; color: var(--muted); display: block; }
   .entry-actions { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+  .entry h2.sm { font-size: 26px; }
+  .item + .item { border-top: 2px solid var(--rule); margin-top: 28px; padding-top: 24px; }
+  .sent { margin-bottom: 26px; padding-bottom: 20px; border-bottom: 2px solid var(--rule); }
+  .src-en { font: italic 400 21px/1.5 var(--f-en); margin: 0 0 8px; overflow-wrap: anywhere; }
+  .tr { font: 700 21px/1.55 var(--f-display); margin: 0; }
+  .found { font-size: 14px; color: var(--muted); margin: 12px 0 0; }
   .note { font-size: 14px; color: var(--muted); margin-top: 16px; }
 </style>
 
 <div class="wrap">
   <header>
     <h1>숙어 해석기</h1>
-    <p>영어 숙어를 넣으면 뜻·뉘앙스·예문을 한국어로 풀어 줘요.</p>
+    <p>영어 숙어나 숙어가 섞인 문장을 넣으면 뜻·뉘앙스·예문을 한국어로 풀어 줘요.</p>
   </header>
 
   <div class="spread">
     <aside class="sheet side">
       <p class="label">숙어 찾기</p>
       <form class="search" id="form" autocomplete="off">
-        <input id="q" type="search" enterkeyhint="search" autocapitalize="none" spellcheck="false"
-          placeholder="예: break the ice" aria-label="영어 숙어">
+        <textarea id="q" rows="2" enterkeyhint="search" autocapitalize="none" spellcheck="false"
+          placeholder="숙어나 문장을 넣어 보세요&#10;예: break the ice / It just pays to be a little paranoid." aria-label="영어 숙어나 문장"></textarea>
         <button id="go" type="submit">해석</button>
       </form>
-      <textarea id="ctx" placeholder="(선택) 숙어가 나온 문장을 붙여 넣으면, 그 문장에서의 뜻도 풀어 줘요."></textarea>
+      <p class="hint">문장을 통째로 넣으면 문장 번역과 그 안의 숙어를 모두 찾아 풀이해 줘요.</p>
       <div class="status" id="status" role="status"></div>
 
       <div class="tabs" role="tablist">
@@ -228,13 +233,13 @@ function scrollToEntry() {
   if (window.innerWidth <= 860) $("entry").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// ---- entry ----
-function showEntry(d) {
-  current = d;
+// ---- result ----
+// 결과 하나 = { translation?: 문장 번역, items: [숙어 풀이…] }
+function entryHTML(d, i, many) {
   const tags = [d.register, ...arr(d.labels)].filter(Boolean);
-  $("entry").innerHTML = `
-    <h2>${esc(d.idiom)}</h2>
-    ${tags.length ? `<div class="tags">${tags.map((t, i) => `<span class="tag${i ? " plain" : ""}">${esc(t)}</span>`).join("")}</div>` : ""}
+  return `<article class="item" data-i="${i}">
+    ${many ? `<h2 class="sm">${esc(d.idiom)}</h2>` : `<h2>${esc(d.idiom)}</h2>`}
+    ${tags.length ? `<div class="tags">${tags.map((t, j) => `<span class="tag${j ? " plain" : ""}">${esc(t)}</span>`).join("")}</div>` : ""}
     <p class="meaning">${esc(d.meaning_ko)}</p>
     ${d.literal_ko ? `<p class="literal">직역: ${esc(d.literal_ko)}</p>` : '<div style="height:12px"></div>'}
     ${d.context_meaning ? `<div class="ctx"><b>이 문장에서는</b>${esc(d.context_meaning)}</div>` : ""}
@@ -245,18 +250,34 @@ function showEntry(d) {
     ${arr(d.similar).length ? `<h3>비슷한 표현</h3><div class="sim">${d.similar.map((s) =>
       `<button data-q="${esc(s.expr)}"><span class="en">${esc(s.expr)}</span><span class="ko">${esc(s.meaning_ko)}</span></button>`).join("")}</div>` : ""}
     <div class="entry-actions">
-      ${d.builtin ? `<button id="more">Claude로 자세히 보기</button>` : ""}
-      <button class="ghost" id="copy">복사</button>
+      ${d.builtin ? `<button class="more">Claude로 자세히 보기</button>` : ""}
+      <button class="ghost copy">복사</button>
     </div>
-    ${d.builtin ? '<p class="note">기본 수록 풀이예요. 유래·비슷한 표현까지 보려면 ‘자세히 보기’를 누르세요.</p>' : ""}`;
-  $("entry").querySelectorAll(".sim button").forEach((b) => (b.onclick = () => { $("q").value = b.dataset.q; $("ctx").value = ""; lookup(); }));
-  $("more")?.addEventListener("click", () => { $("q").value = d.idiom; lookup(); });
-  $("copy").onclick = async (e) => {
-    const btn = e.currentTarget;
-    try { await navigator.clipboard.writeText(toText(d)); btn.textContent = "복사했어요"; } catch { btn.textContent = "복사 안 됨"; }
-    setTimeout(() => (btn.textContent = "복사"), 1500);
-  };
+    ${d.builtin ? '<p class="note">기본 수록 풀이예요. 유래·비슷한 표현까지 보려면 ‘자세히 보기’를 누르세요.</p>' : ""}
+  </article>`;
 }
+
+function showResult(r) {
+  const items = arr(r.items);
+  const many = items.length > 1 || !!r.translation;
+  $("entry").innerHTML = `
+    ${r.translation ? `<section class="sent"><p class="label">문장 해석</p>
+      <p class="src-en">${esc(r.sentence)}</p><p class="tr">${esc(r.translation)}</p>
+      ${items.length ? `<p class="found">숙어·관용 표현 ${items.length}개</p>` : '<p class="found">따로 풀이할 숙어는 없어요.</p>'}</section>` : ""}
+    ${items.map((d, i) => entryHTML(d, i, many)).join("")}`;
+  $("entry").querySelectorAll(".item").forEach((el) => {
+    const d = items[+el.dataset.i];
+    el.querySelectorAll(".sim button").forEach((b) => (b.onclick = () => { $("q").value = b.dataset.q; lookup(); }));
+    el.querySelector(".more")?.addEventListener("click", () => { $("q").value = d.idiom; lookup(); });
+    el.querySelector(".copy").onclick = async (e) => {
+      const btn = e.currentTarget;
+      const text = (r.translation ? `${r.sentence}\n→ ${r.translation}\n\n` : "") + toText(d);
+      try { await navigator.clipboard.writeText(text); btn.textContent = "복사했어요"; } catch { btn.textContent = "복사 안 됨"; }
+      setTimeout(() => (btn.textContent = "복사"), 1500);
+    };
+  });
+}
+const showEntry = (d) => showResult({ items: [d] });
 
 function toText(d) {
   const L = [d.idiom, `뜻: ${d.meaning_ko}`];
@@ -269,31 +290,39 @@ function toText(d) {
   return L.join("\n");
 }
 
-function buildPrompt(q, ctx) {
-  return `너는 한국 학생에게 영어 숙어를 가르치는 선생님이다. 아래 영어 표현을 한국어로 풀이해라.
+function buildPrompt(q) {
+  return `너는 한국 학생에게 영어 숙어를 가르치는 선생님이다. 아래 입력을 보고 한국어로 풀이해라.
 
-- 입력이 숙어·관용구·구동사가 아니거나 철자가 조금 틀렸으면, 가장 가까운 숙어로 바로잡아 idiom에 넣는다. 영어 표현이 아니거나 뜻을 알 수 없으면 found를 false로 하고 meaning_ko에 이유를 짧게 쓴다.
+입력은 두 가지 중 하나다.
+(가) 숙어·관용구·구동사 하나 (예: "break the ice", "pay off"). 철자가 조금 틀렸으면 가장 가까운 숙어로 바로잡는다.
+(나) 숙어가 섞인 문장 (예: "It just pays to be a little paranoid (but not a lot)."). 이때는
+   - translation에 문장 전체의 자연스러운 한국어 번역을 쓴다.
+   - 문장 속 숙어·관용 표현·구동사·패턴(예: "it pays to + 동사", "but not a lot"처럼 단어 뜻만으로는 이해하기 어려운 것, 문맥상 원래 뜻과 다르게 쓰인 단어 포함)을 모두 찾아 items에 하나씩 넣는다. idiom에는 사전에 실리는 기본형으로 쓴다 (예: "it pays to do something").
+   - 각 item의 context_meaning에 이 문장에서 그 표현이 어떤 뜻·역할인지 쓴다.
+   - 쉬운 일반 단어는 넣지 않는다. 풀이할 것이 없으면 items는 빈 배열.
+(가)이면 translation은 빈 문자열, items는 1개, context_meaning은 빈 문자열.
+영어가 아니거나 뜻을 알 수 없으면 found를 false로 하고 translation에 이유를 짧게 쓴다.
+
+각 item:
 - meaning_ko: 자연스러운 한국어 뜻 (비슷한 한국어 속담·관용구가 있으면 함께). 뜻이 여럿이면 "1. … 2. …" 식으로.
 - literal_ko: 단어 그대로의 직역. 직역과 뜻이 같으면 빈 문자열.
 - register: "구어", "일상", "격식", "비속어", "문어" 중 하나.
 - labels: 미국식/영국식, 다소 낡은 표현, 흔함 등 붙일 만한 꼬리표 0~3개.
 - nuance: 언제·누구에게·어떤 기분으로 쓰는지, 주의할 점 2~3문장.
 - origin: 알려진 유래 1~2문장. 확실하지 않으면 빈 문자열(지어내지 말 것).
-- examples: 일상적인 예문 3개, 각각 자연스러운 한국어 번역.
+- examples: 일상적인 예문 (가)이면 3개, (나)이면 2개, 각각 자연스러운 한국어 번역.
 - similar: 비슷하거나 반대 뜻의 영어 표현 2~4개.
-- context_meaning: 문장이 주어졌으면 그 문장에서 이 표현이 어떤 뜻인지와 문장 전체 번역. 문장이 없으면 빈 문자열.
 
 다른 말 없이 아래 형태의 JSON 객체 하나만 답해라:
-{"found": true, "idiom": "...", "meaning_ko": "...", "literal_ko": "...", "register": "구어", "labels": ["..."], "nuance": "...", "origin": "...",
- "examples": [{"en": "...", "ko": "..."}], "similar": [{"expr": "...", "meaning_ko": "..."}], "context_meaning": "..."}
+{"found": true, "translation": "...", "items": [{"idiom": "...", "meaning_ko": "...", "literal_ko": "...", "register": "구어", "labels": ["..."], "nuance": "...", "origin": "...",
+ "examples": [{"en": "...", "ko": "..."}], "similar": [{"expr": "...", "meaning_ko": "..."}], "context_meaning": "..."}]}
 
-<expression>${q}</expression>${ctx ? `\n<sentence>${ctx}</sentence>` : ""}`;
+<input>${q}</input>`;
 }
 
 async function lookup() {
-  const q = $("q").value.trim().slice(0, 200);
-  const ctx = $("ctx").value.trim().slice(0, 2000);
-  if (!q) { setStatus("숙어를 입력해 주세요.", true); $("q").focus(); return; }
+  const q = $("q").value.replace(/\s+/g, " ").trim().slice(0, 1500);
+  if (!q) { setStatus("숙어나 문장을 입력해 주세요.", true); $("q").focus(); return; }
 
   await samplePromise;
   if (!sample) {
@@ -307,16 +336,21 @@ async function lookup() {
   ctl = new AbortController();
   const mine = ctl;
   $("go").disabled = true;
-  setStatus('<span class="spinner"></span>풀이 중이에요. 보통 10초 안팎 걸려요.');
+  const isSentence = q.split(" ").length > 6 || /[.?!]$/.test(q);
+  setStatus(`<span class="spinner"></span>풀이 중이에요. ${isSentence ? "문장은 20~30초" : "보통 10초 안팎"} 걸려요.`);
   try {
-    const d = await sample.json(buildPrompt(q, ctx), { signal: mine.signal, modelTier: "quick" });
-    if (!d || typeof d !== "object" || !d.meaning_ko) throw { code: "invalid_json" };
-    if (d.found === false) { setStatus(esc(d.meaning_ko), true); return; }
-    d.idiom = d.idiom || q;
-    showEntry(d);
-    saveRecent(d);
+    const r = await sample.json(buildPrompt(q), { signal: mine.signal, modelTier: isSentence ? "default" : "quick" });
+    if (!r || typeof r !== "object") throw { code: "invalid_json" };
+    if (r.found === false) { setStatus(esc(r.translation || "풀이할 수 없는 입력이에요."), true); return; }
+    const items = arr(r.items).filter((d) => d && d.idiom && d.meaning_ko);
+    if (!items.length && !r.translation) throw { code: "invalid_json" };
+    r.items = items;
+    if (r.translation) r.sentence = q;
+    showResult(r);
+    items.forEach((d) => saveRecent(d));
     renderList();
-    setStatus(norm(d.idiom) !== norm(q) ? `‘${esc(q)}’ → ‘${esc(d.idiom)}’(으)로 찾았어요.` : "");
+    const fixed = !r.translation && items[0] && norm(items[0].idiom) !== norm(q);
+    setStatus(fixed ? `‘${esc(q)}’ → ‘${esc(items[0].idiom)}’(으)로 찾았어요.` : "");
     scrollToEntry();
   } catch (e) {
     if (e?.code === "cancelled") return;
@@ -327,6 +361,9 @@ async function lookup() {
 }
 
 $("form").addEventListener("submit", (e) => { e.preventDefault(); $("q").blur(); lookup(); });
+$("q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); }
+});
 
 renderList();
 showEntry(BUILTIN[0]);
