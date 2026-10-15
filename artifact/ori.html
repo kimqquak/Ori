@@ -1,0 +1,383 @@
+<title>Ori 글 구조화</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: workbook spread — 원문(왼쪽) · 구조(오른쪽), 좁은 화면에서는 위아래로 쌓임 */
+  :root {
+    --paper: #f3f5f4; --sheet: #ffffff; --ink: #1b2422; --muted: #5f6b68; --rule: #dbe1df;
+    --accent: #1f5f8b; --accent-soft: #e2edf5; --mark: #fff1b8;
+    --c-claim: #1f5f8b; --c-evidence: #2e7d5b; --c-example: #9a6a00;
+    --c-counter: #b23a3a; --c-rebut: #6b4aa0; --c-concl: #1b2422;
+    --f-display: "Gowun Batang", "Nanum Myeongjo", "AppleMyungjo", serif;
+    --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121716; --sheet: #1a201f; --ink: #e6ecea; --muted: #9aa7a3; --rule: #2c3533;
+      --accent: #7db8e0; --accent-soft: #1d2d38; --mark: #4a4020;
+      --c-claim: #7db8e0; --c-evidence: #74c59e; --c-example: #e0b450;
+      --c-counter: #ec8b84; --c-rebut: #b9a0e6; --c-concl: #e6ecea;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121716; --sheet: #1a201f; --ink: #e6ecea; --muted: #9aa7a3; --rule: #2c3533;
+    --accent: #7db8e0; --accent-soft: #1d2d38; --mark: #4a4020;
+    --c-claim: #7db8e0; --c-evidence: #74c59e; --c-example: #e0b450;
+    --c-counter: #ec8b84; --c-rebut: #b9a0e6; --c-concl: #e6ecea;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink); font: 16px/1.7 var(--f-body); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font: 700 30px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
+  header p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .spread { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .spread { grid-template-columns: minmax(0, 1fr); } }
+
+  .sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 20px; min-width: 0; }
+  .src { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+  @media (max-width: 900px) { .src { position: static; } }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  textarea { width: 100%; min-height: 340px; padding: 14px; border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--paper); color: var(--ink); font: 16px/1.75 var(--f-body); resize: vertical; }
+  @media (max-width: 900px) { textarea { min-height: 220px; } }
+  textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  button { font: 600 16px var(--f-body); min-height: 44px; padding: 0 18px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--sheet); }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--rule); font-weight: 500; }
+  button:disabled { opacity: .45; cursor: default; }
+  .count { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; margin-left: auto; }
+  .status { margin-top: 10px; font-size: 14px; color: var(--muted); min-height: 1.4em; }
+  .status.err { color: var(--c-counter); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--rule); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+  .result { display: grid; gap: 16px; min-width: 0; }
+  .sample-note { font-size: 13px; color: var(--muted); background: var(--accent-soft); border-radius: 4px; padding: 6px 12px; }
+  .title { font: 700 26px/1.3 var(--f-display); margin: 0 0 14px; text-wrap: balance; }
+  .kv { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 14px; margin: 0; }
+  .kv dt { color: var(--muted); font-size: 14px; padding-top: 2px; }
+  .kv dd { margin: 0; }
+  .main-idea { background: linear-gradient(transparent 55%, var(--mark) 55%); font-weight: 600; }
+
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); margin: -4px 0 16px; overflow-x: auto; }
+  .tab { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted);
+    font-weight: 500; padding: 0 14px; white-space: nowrap; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .para { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px solid var(--rule); }
+  .para:first-child { border-top: 0; padding-top: 0; }
+  .num { font: 700 20px/1.3 var(--f-display); color: var(--accent); font-variant-numeric: tabular-nums; }
+  .role { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 3px;
+    background: var(--accent-soft); color: var(--accent); margin-right: 8px; vertical-align: 2px; }
+  .key { font-family: var(--f-display); color: var(--muted); margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--rule); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 8px; min-height: 32px; display: flex; align-items: center; }
+  details p { font-size: 15px; white-space: pre-wrap; margin: 4px 0 0; }
+
+  .flow { list-style: none; margin: 0; padding: 0 0 0 26px; position: relative; }
+  .flow::before { content: ""; position: absolute; left: 8px; top: 10px; bottom: 10px; width: 2px; background: var(--rule); }
+  .flow li { position: relative; margin-bottom: 14px; }
+  .flow li::before { content: ""; position: absolute; left: -23px; top: 9px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--sheet); border: 3px solid var(--dot); }
+  .flow .t { font-weight: 700; color: var(--dot); margin-right: 8px; }
+  .refs { color: var(--muted); font-size: 13px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+
+  .outline ol { margin: 4px 0; padding-left: 26px; }
+  .outline > ol { list-style: upper-roman; padding-left: 34px; }
+  .outline > ol > li { font: 700 17px/1.6 var(--f-display); margin-bottom: 10px; }
+  .outline > ol > li > ol { list-style: decimal; font: 400 16px/1.7 var(--f-body); }
+  .outline > ol > li > ol > li > ol { list-style: none; padding-left: 16px; color: var(--muted); }
+  .outline > ol > li > ol > li > ol > li::before { content: "– "; }
+
+  h3 { font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  h3.gap { margin-top: 24px; }
+  .tbl { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 10px; border-top: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; border-top: 0; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  td.ctx { font-family: var(--f-display); color: var(--muted); }
+  .empty { color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Ori 글 구조화</h1>
+    <p>영어·국어 글을 넣으면 주제, 문단 요약, 논리 흐름, 개요, 핵심어를 정리해요.</p>
+  </header>
+
+  <div class="spread">
+    <section class="sheet src" aria-label="원문">
+      <p class="label">원문 · 문단은 빈 줄로 구분</p>
+      <textarea id="input" placeholder="여기에 글을 붙여넣으세요"></textarea>
+      <div class="row">
+        <button id="go">구조화하기</button>
+        <button class="ghost" id="stop" hidden>멈추기</button>
+        <button class="ghost" id="clear">지우기</button>
+        <span class="count" id="count">0자</span>
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </section>
+
+    <section class="result" id="result" aria-label="구조화 결과">
+      <p class="sample-note" id="sample-note">아래는 예시 글의 결과예요. 왼쪽에 내 글을 넣고 <b>구조화하기</b>를 누르세요.</p>
+      <div class="sheet">
+        <p class="title" id="r-title"></p>
+        <dl class="kv">
+          <dt>주제</dt><dd id="r-topic"></dd>
+          <dt>요지</dt><dd><span class="main-idea" id="r-main"></span></dd>
+          <dt>요약</dt><dd id="r-summary"></dd>
+        </dl>
+      </div>
+      <div class="sheet">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-pane="p-paras">문단별 요약</button>
+          <button class="tab" role="tab" aria-selected="false" data-pane="p-flow">논리 흐름</button>
+          <button class="tab" role="tab" aria-selected="false" data-pane="p-outline">개요</button>
+          <button class="tab" role="tab" aria-selected="false" data-pane="p-words">핵심어·어휘</button>
+        </div>
+        <div class="pane" id="p-paras"></div>
+        <div class="pane" id="p-flow" hidden></div>
+        <div class="pane outline" id="p-outline" hidden></div>
+        <div class="pane" id="p-words" hidden></div>
+      </div>
+      <div class="row">
+        <button class="ghost" id="copy-md">Markdown 복사</button>
+        <button class="ghost" id="copy-json">JSON 복사</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (v) => (Array.isArray(v) ? v : []);
+const FLOW_COLOR = { "주장": "--c-claim", "근거": "--c-evidence", "예시": "--c-example", "반론": "--c-counter", "재반박": "--c-rebut", "결론": "--c-concl" };
+const DRAFT_KEY = "ori-draft";
+
+const SAMPLE_TEXT = `Many students treat sleep as the first thing to sacrifice before an exam. Yet sleep is not a luxury but a necessity for learning.
+
+During deep sleep, the brain consolidates memories, moving what we studied during the day into long-term storage. In one study, students who slept after studying scored about 20 percent higher than those who stayed awake.
+
+Some students believe all-nighters pay off because they gain extra hours. However, the information crammed in those hours is poorly retained, so the time gained is lost again.
+
+Therefore, schedule sleep as you schedule study.`;
+
+const SAMPLE_RESULT = {
+  title: "공부의 마지막 단계, 잠", topic: "수면이 학습에 미치는 영향",
+  main_idea: "수면은 기억을 굳히는 학습의 필수 과정이므로 공부 계획에 포함해야 한다.",
+  summary: "글쓴이는 수면이 학습의 필수 요소라고 주장한다. 깊은 수면 중 기억이 장기 기억으로 옮겨진다는 사실과 실험 결과를 근거로 든다. 밤샘이 시간을 벌어 준다는 반론을 소개한 뒤, 밤샘으로 익힌 내용은 잘 남지 않는다며 반박한다. 결론적으로 수면도 공부처럼 계획하라고 권한다.",
+  paragraphs: [
+    { index: 1, role: "주장", summary: "시험 전 잠부터 줄이지만, 수면은 학습의 필수 요소다.", key_sentence: "Yet sleep is not a luxury but a necessity for learning." },
+    { index: 2, role: "근거", summary: "깊은 수면 중 기억이 강화되고, 실험에서도 점수가 약 20% 높았다.", key_sentence: "During deep sleep, the brain consolidates memories." },
+    { index: 3, role: "반론", summary: "밤샘이 시간을 벌어 준다는 생각은 기억이 남지 않아 틀렸다.", key_sentence: "However, the information crammed in those hours is poorly retained." },
+    { index: 4, role: "결론", summary: "공부처럼 수면도 계획하라.", key_sentence: "Therefore, schedule sleep as you schedule study." },
+  ],
+  logic_flow: [
+    { type: "주장", content: "수면은 학습의 필수 요소다", paragraphs: [1] },
+    { type: "근거", content: "깊은 수면 중 기억이 장기 기억으로 굳어진다", paragraphs: [2] },
+    { type: "예시", content: "공부 후 잔 학생의 점수가 약 20% 높았던 연구", paragraphs: [2] },
+    { type: "반론", content: "밤샘은 공부 시간을 더 확보해 준다", paragraphs: [3] },
+    { type: "재반박", content: "벼락치기한 내용은 잘 남지 않아 얻은 시간이 다시 사라진다", paragraphs: [3] },
+    { type: "결론", content: "수면을 공부 계획에 포함하라", paragraphs: [4] },
+  ],
+  outline: [
+    { heading: "문제 제기와 주장", points: [{ text: "시험 전 수면을 먼저 줄이는 학생들", details: [] }, { text: "수면은 학습의 필수 요소", details: [] }] },
+    { heading: "근거", points: [{ text: "기억 강화(consolidation)", details: ["깊은 수면 중 장기 기억으로 이동", "수면 후 점수 약 20% 향상"] }] },
+    { heading: "반론과 재반박", points: [{ text: "밤샘이 시간을 번다는 주장", details: ["벼락치기 내용은 잘 남지 않음"] }] },
+    { heading: "결론", points: [{ text: "수면도 공부처럼 계획하라", details: [] }] },
+  ],
+  keywords: [
+    { term: "memory consolidation", explanation: "자는 동안 낮에 익힌 내용이 장기 기억으로 굳어지는 과정. 글의 핵심 근거." },
+    { term: "all-nighter", explanation: "밤샘 공부. 글쓴이가 반박하는 대상." },
+  ],
+  vocabulary: [
+    { word: "sacrifice", meaning: "희생하다", context: "the first thing to sacrifice before an exam" },
+    { word: "consolidate", meaning: "강화하다, 굳히다", context: "the brain consolidates memories" },
+    { word: "pay off", meaning: "성과를 내다, 보람이 있다", context: "all-nighters pay off" },
+    { word: "retain", meaning: "(기억 등을) 유지하다", context: "is poorly retained" },
+  ],
+};
+SAMPLE_RESULT.source_paragraphs = splitParagraphs(SAMPLE_TEXT);
+
+let last = SAMPLE_RESULT;
+let ctl = null;
+
+function splitParagraphs(text) {
+  const t = text.replace(/\r\n/g, "\n").trim();
+  let parts = t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 1) parts = t.split("\n").map((p) => p.trim()).filter(Boolean);
+  return parts;
+}
+
+function buildPrompt(paragraphs) {
+  const numbered = paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n\n");
+  return `너는 국어·영어 독해를 가르치는 선생님이다. 학생이 글의 구조를 한눈에 파악할 수 있도록 아래 글을 분석해라.
+
+규칙:
+- 원문 언어와 관계없이 모든 설명은 한국어로 쓴다. 단, key_sentence와 vocabulary의 word/context는 원문 그대로 둔다.
+- 문단에는 [1], [2]처럼 번호가 붙어 있다. paragraphs에는 모든 문단(총 ${paragraphs.length}개)을 빠짐없이 그 번호로 넣는다.
+- paragraphs[].role은 다음 중 하나: 도입, 문제 제기, 주장, 근거, 예시, 부연, 반론, 재반박, 전환, 결론
+- logic_flow는 글 전체의 논증 흐름을 순서대로 정리한다. type은 주장, 근거, 예시, 반론, 재반박, 결론 중 하나. paragraphs에는 그 내용이 나온 문단 번호를 넣는다. 논설문이 아니면(설명문, 서사 등) 중심 내용과 그것을 뒷받침하는 내용으로 흐름을 잡는다.
+- outline은 2~5개의 큰 항목(heading), 각 항목 아래 points(text와 details 배열). 원문에 없는 내용은 지어내지 않는다.
+- keywords는 글 이해에 핵심인 용어 3~8개(이 글에서의 의미/역할 설명).
+- vocabulary는 영어 글이면 수준 있는 단어·숙어 5~12개, 국어 글이면 어려운 한자어·개념어 3~10개. 없으면 빈 배열.
+
+다른 말 없이 아래 형태의 JSON 객체 하나만 답해라:
+{"title": "글에 어울리는 짧은 제목", "topic": "주제(명사구)", "main_idea": "요지 한 문장", "summary": "3~4문장 요약",
+ "paragraphs": [{"index": 1, "role": "주장", "summary": "문단 핵심 한 줄", "key_sentence": "원문 중심 문장"}],
+ "logic_flow": [{"type": "주장", "content": "...", "paragraphs": [1]}],
+ "outline": [{"heading": "...", "points": [{"text": "...", "details": ["..."]}]}],
+ "keywords": [{"term": "...", "explanation": "..."}],
+ "vocabulary": [{"word": "...", "meaning": "한국어 뜻", "context": "원문 구절"}]}
+
+<text>
+${numbered}
+</text>`;
+}
+
+const ERRORS = {
+  not_granted: "Claude 사용이 허용되지 않았어요. 페이지를 새로 고친 뒤 허용을 눌러 주세요.",
+  sampling_disabled: "이 계정에서는 Claude를 쓸 수 없어요.",
+  rate_limited: "요청이 많거나 사용 한도에 도달했어요. 잠시 후 다시 시도해 주세요.",
+  session_expired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+  prompt_too_large: "글이 너무 길어요. 나눠서 넣어 주세요.",
+  refused: "이 글은 분석할 수 없다는 답을 받았어요. 내용을 바꿔서 시도해 주세요.",
+  invalid_json: "결과 형식이 깨졌어요. 한 번 더 눌러 주세요.",
+  empty_completion: "빈 답이 왔어요. 글을 조금 줄여서 다시 시도해 주세요.",
+};
+
+// ---- input ----
+const input = $("input");
+const updateCount = () => { $("count").textContent = input.value.length.toLocaleString() + "자"; };
+try { input.value = localStorage.getItem(DRAFT_KEY) ?? SAMPLE_TEXT; } catch { input.value = SAMPLE_TEXT; }
+updateCount();
+input.addEventListener("input", () => {
+  updateCount();
+  try { localStorage.setItem(DRAFT_KEY, input.value); } catch {}
+});
+$("clear").onclick = () => { input.value = ""; input.dispatchEvent(new Event("input")); input.focus(); };
+
+document.querySelectorAll(".tab").forEach((t) => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === t)));
+  document.querySelectorAll(".pane").forEach((p) => { p.hidden = p.id !== t.dataset.pane; });
+});
+
+function setStatus(html, isErr = false) {
+  $("status").className = "status" + (isErr ? " err" : "");
+  $("status").innerHTML = html;
+}
+
+// ---- Claude ----
+let samplePromise = (window.claude?.use ? window.claude.use("sample") : Promise.resolve(null)).catch(() => null);
+
+$("go").onclick = async () => {
+  const paragraphs = splitParagraphs(input.value);
+  if (!paragraphs.length) { setStatus("분석할 글을 넣어 주세요.", true); return; }
+  const sample = await samplePromise;
+  if (!sample) { setStatus("이 화면에서는 Claude를 쓸 수 없어요. claude.ai에 로그인한 상태로 열어 주세요.", true); return; }
+
+  ctl = new AbortController();
+  $("go").disabled = true; $("stop").hidden = false;
+  setStatus('<span class="spinner"></span>분석 중이에요. 글 길이에 따라 30초~1분 정도 걸려요.');
+  try {
+    const data = await sample.json(buildPrompt(paragraphs), { signal: ctl.signal, modelTier: "default" });
+    if (!data || typeof data !== "object" || !Array.isArray(data.paragraphs)) throw { code: "invalid_json" };
+    data.source_paragraphs = paragraphs;
+    last = data;
+    $("sample-note").hidden = true;
+    render(data);
+    setStatus("완료");
+    if (window.innerWidth <= 900) $("result").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    if (e?.code === "cancelled") setStatus("멈췄어요.");
+    else setStatus(ERRORS[e?.code] || "연결에 문제가 있었어요. 다시 시도해 주세요.", true);
+  } finally {
+    $("go").disabled = false; $("stop").hidden = true; ctl = null;
+  }
+};
+$("stop").onclick = () => ctl?.abort();
+
+// ---- render ----
+function render(d) {
+  $("r-title").textContent = d.title || "";
+  $("r-topic").textContent = d.topic || "";
+  $("r-main").textContent = d.main_idea || "";
+  $("r-summary").textContent = d.summary || "";
+  const src = arr(d.source_paragraphs);
+
+  $("p-paras").innerHTML = arr(d.paragraphs).map((p) => `
+    <div class="para">
+      <div class="num">${esc(p.index)}</div>
+      <div>
+        <span class="role">${esc(p.role)}</span>${esc(p.summary)}
+        ${p.key_sentence ? `<div class="key">${esc(p.key_sentence)}</div>` : ""}
+        ${src[p.index - 1] ? `<details><summary>원문 보기</summary><p>${esc(src[p.index - 1])}</p></details>` : ""}
+      </div>
+    </div>`).join("") || '<p class="empty">문단 정보가 없어요.</p>';
+
+  const flow = arr(d.logic_flow);
+  $("p-flow").innerHTML = flow.length ? `<ol class="flow">${flow.map((s) => `
+    <li style="--dot: var(${FLOW_COLOR[s.type] || "--accent"})">
+      <span class="t">${esc(s.type)}</span>${esc(s.content)}${arr(s.paragraphs).length ? `<span class="refs">${arr(s.paragraphs).map(esc).join(", ")}문단</span>` : ""}
+    </li>`).join("")}</ol>` : '<p class="empty">논리 흐름이 없어요.</p>';
+
+  $("p-outline").innerHTML = `<ol>${arr(d.outline).map((sec) => `
+    <li>${esc(sec.heading)}<ol>${arr(sec.points).map((pt) => `
+      <li>${esc(pt.text)}${arr(pt.details).length ? `<ol>${arr(pt.details).map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}</li>`).join("")}
+    </ol></li>`).join("")}</ol>`;
+
+  const kw = arr(d.keywords), voc = arr(d.vocabulary);
+  $("p-words").innerHTML = `
+    <h3>핵심어</h3>
+    ${kw.length ? table(["용어", "설명"], kw.map((k) => [k.term, k.explanation])) : '<p class="empty">핵심어가 없어요.</p>'}
+    <h3 class="gap">어휘</h3>
+    ${voc.length ? table(["단어", "뜻", "원문"], voc.map((v) => [v.word, v.meaning, v.context]), 2) : '<p class="empty">정리할 어휘가 없어요.</p>'}`;
+}
+
+function table(head, rows, ctxCol = -1) {
+  return `<div class="tbl"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) =>
+    `<tr>${r.map((c, i) => `<td${i === ctxCol ? ' class="ctx"' : ""}>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+// ---- export ----
+function toMarkdown(d) {
+  const L = [`# ${d.title}`, "", `- **주제**: ${d.topic}`, `- **요지**: ${d.main_idea}`, "", "## 요약", d.summary, "", "## 문단별 요약"];
+  arr(d.paragraphs).forEach((p) => L.push(`${p.index}. [${p.role}] ${p.summary}`));
+  L.push("", "## 논리 흐름");
+  arr(d.logic_flow).forEach((s) => L.push(`- **${s.type}**: ${s.content}${arr(s.paragraphs).length ? ` (${s.paragraphs.join(", ")}문단)` : ""}`));
+  L.push("", "## 개요");
+  const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+  arr(d.outline).forEach((sec, i) => {
+    L.push(`${roman[i] || i + 1}. ${sec.heading}`);
+    arr(sec.points).forEach((pt, j) => { L.push(`   ${j + 1}. ${pt.text}`); arr(pt.details).forEach((x) => L.push(`      - ${x}`)); });
+  });
+  L.push("", "## 핵심어");
+  arr(d.keywords).forEach((k) => L.push(`- **${k.term}**: ${k.explanation}`));
+  if (arr(d.vocabulary).length) {
+    L.push("", "## 어휘", "| 단어 | 뜻 | 원문 |", "|---|---|---|");
+    d.vocabulary.forEach((v) => L.push(`| ${v.word} | ${v.meaning} | ${String(v.context).replace(/\|/g, "\\|")} |`));
+  }
+  return L.join("\n");
+}
+
+async function copy(btn, text, label) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = "복사했어요"; }
+  catch { btn.textContent = "복사 안 됨"; }
+  setTimeout(() => (btn.textContent = label), 1500);
+}
+$("copy-md").onclick = (e) => copy(e.currentTarget, toMarkdown(last), "Markdown 복사");
+$("copy-json").onclick = (e) => copy(e.currentTarget, JSON.stringify(last, null, 2), "JSON 복사");
+
+render(SAMPLE_RESULT);
+</script>

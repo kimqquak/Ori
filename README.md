@@ -28,3 +28,10 @@ uvicorn app:app --reload
 | `static/index.html` | 입력창과 결과 화면 |
 
 모델은 `claude-opus-5-5`를 쓰며, 출력 형식은 `structurer.py`의 `STRUCTURE_SCHEMA`로 고정되어 있습니다.
+
+## 태블릿·휴대폰에서 쓰기
+
+`artifact/ori.html`은 claude.ai 아티팩트로 올린 버전입니다. 서버나 API 키 없이 claude.ai에 로그인한 브라우저에서 바로 열립니다.
+글 분석은 내 Claude 계정 사용량으로 처리되며, 처음 쓸 때 Claude 사용을 허용할지 묻습니다.
+
+- 링크: https://claude.ai/artifact/6WW7eb8HUUJLUHUu3GMdAf
