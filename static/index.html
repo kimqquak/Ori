@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ori · 글 구조화</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a65; --line: #e4e2db;
+    --accent: #2f5d50; --accent-soft: #e3eee9;
+    --c-claim: #2f5d50; --c-evidence: #3b5b92; --c-example: #8a6d1f;
+    --c-counter: #a3423a; --c-rebut: #6a4c93; --c-concl: #1d1d1b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --panel: #201f1d; --ink: #ecebe6; --muted: #a09e97; --line: #34332f;
+      --accent: #7fbfa9; --accent-soft: #24332e;
+      --c-claim: #7fbfa9; --c-evidence: #8fb0e6; --c-example: #d9b860;
+      --c-counter: #e58a80; --c-rebut: #b99be0; --c-concl: #ecebe6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.65 "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  textarea { width: 100%; min-height: 220px; padding: 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel); color: var(--ink); font: inherit; resize: vertical; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  button { border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; cursor: pointer;
+    background: var(--accent); color: var(--bg); font-weight: 600; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  .count, .status { color: var(--muted); font-size: 14px; }
+  .error { color: var(--c-counter); }
+  #result { margin-top: 32px; display: none; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+  .title { font-size: 22px; font-weight: 700; margin: 0 0 10px; }
+  .kv { display: grid; grid-template-columns: 64px 1fr; gap: 6px 12px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  .main-idea { display: inline-block; background: var(--accent-soft); border-radius: 8px; padding: 8px 12px; font-weight: 600; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+  .tab { background: none; color: var(--muted); border-radius: 0; padding: 10px 14px; font-weight: 500;
+    border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .pane { display: none; } .pane.active { display: block; }
+  .para { display: grid; grid-template-columns: 40px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .para:first-child { border-top: 0; }
+  .num { font-weight: 700; color: var(--accent); font-size: 18px; }
+  .role { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft);
+    color: var(--accent); font-weight: 600; margin-right: 6px; }
+  .key { color: var(--muted); font-size: 14px; margin-top: 4px; border-left: 3px solid var(--line); padding-left: 10px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 6px; }
+  details p { font-size: 14px; white-space: pre-wrap; margin: 6px 0 0; }
+  .flow { position: relative; padding-left: 22px; }
+  .flow::before { content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+  .step { position: relative; margin-bottom: 14px; }
+  .step::before { content: ""; position: absolute; left: -20px; top: 8px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--dot, var(--accent)); }
+  .step .t { font-weight: 700; color: var(--dot); margin-right: 6px; }
+  .refs { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .outline ol { margin: 4px 0; padding-left: 26px; }
+  .outline > ol { list-style: upper-roman; padding-left: 30px; }
+  .outline > ol > li { font-weight: 700; margin-bottom: 8px; }
+  .outline > ol > li > ol { list-style: decimal; font-weight: 400; }
+  .outline > ol > li > ol > li > ol { list-style: none; padding-left: 18px; color: var(--muted); }
+  .outline > ol > li > ol > li > ol > li::before { content: "- "; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  td.ctx { color: var(--muted); font-style: italic; }
+  .empty { color: var(--muted); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 600px) { .kv { grid-template-columns: 1fr; } .para { grid-template-columns: 28px 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ori · 글 구조화</h1>
+  <p class="sub">영어·국어 글을 붙여넣으면 주제, 문단 요약, 논리 흐름, 개요, 핵심어를 정리해 줍니다. 문단은 빈 줄로 구분해 주세요.</p>
+
+  <textarea id="input" placeholder="여기에 글을 붙여넣으세요…"></textarea>
+  <div class="row">
+    <button id="go">구조화하기</button>
+    <button class="ghost" id="clear">지우기</button>
+    <span class="count" id="count">0자</span>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="result">
+    <div class="card">
+      <p class="title" id="r-title"></p>
+      <dl class="kv">
+        <dt>주제</dt><dd id="r-topic"></dd>
+        <dt>요지</dt><dd><span class="main-idea" id="r-main"></span></dd>
+        <dt>요약</dt><dd id="r-summary"></dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-pane="p-paras">문단별 요약</button>
+        <button class="tab" data-pane="p-flow">논리 흐름</button>
+        <button class="tab" data-pane="p-outline">개요</button>
+        <button class="tab" data-pane="p-words">핵심어·어휘</button>
+      </div>
+      <div class="pane active" id="p-paras"></div>
+      <div class="pane" id="p-flow"></div>
+      <div class="pane outline" id="p-outline"></div>
+      <div class="pane" id="p-words"></div>
+    </div>
+
+    <div class="row">
+      <button class="ghost" id="copy-md">Markdown 복사</button>
+      <button class="ghost" id="dl-json">JSON 저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const FLOW_COLOR = { "주장": "--c-claim", "근거": "--c-evidence", "예시": "--c-example", "반론": "--c-counter", "재반박": "--c-rebut", "결론": "--c-concl" };
+let last = null;
+
+$("input").addEventListener("input", () => { $("count").textContent = $("input").value.length.toLocaleString() + "자"; });
+$("clear").onclick = () => { $("input").value = ""; $("input").dispatchEvent(new Event("input")); $("result").style.display = "none"; $("status").textContent = ""; };
+
+document.querySelectorAll(".tab").forEach((t) => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("active", p.id === t.dataset.pane));
+});
+
+$("go").onclick = async () => {
+  const text = $("input").value.trim();
+  if (!text) return;
+  $("go").disabled = true;
+  $("status").className = "status";
+  $("status").innerHTML = '<span class="spinner"></span>분석 중… (글 길이에 따라 수십 초 걸릴 수 있어요)';
+  try {
+    const res = await fetch("/api/structure", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "요청이 올바르지 않습니다.");
+    last = data;
+    render(data);
+    $("status").textContent = "";
+  } catch (e) {
+    $("status").className = "status error";
+    $("status").textContent = "오류: " + e.message;
+  } finally {
+    $("go").disabled = false;
+  }
+};
+
+function render(d) {
+  $("r-title").textContent = d.title;
+  $("r-topic").textContent = d.topic;
+  $("r-main").textContent = d.main_idea;
+  $("r-summary").textContent = d.summary;
+
+  $("p-paras").innerHTML = d.paragraphs.map((p) => `
+    <div class="para">
+      <div class="num">${p.index}</div>
+      <div>
+        <span class="role">${esc(p.role)}</span>${esc(p.summary)}
+        <div class="key">${esc(p.key_sentence)}</div>
+        ${d.source_paragraphs[p.index - 1] ? `<details><summary>원문 보기</summary><p>${esc(d.source_paragraphs[p.index - 1])}</p></details>` : ""}
+      </div>
+    </div>`).join("");
+
+  $("p-flow").innerHTML = d.logic_flow.length ? `<div class="flow">${d.logic_flow.map((s) => `
+    <div class="step" style="--dot: var(${FLOW_COLOR[s.type] || "--accent"})">
+      <span class="t">${esc(s.type)}</span>${esc(s.content)}
+      ${s.paragraphs.length ? `<span class="refs">[${s.paragraphs.join(", ")}문단]</span>` : ""}
+    </div>`).join("")}</div>` : '<p class="empty">논리 흐름 없음</p>';
+
+  $("p-outline").innerHTML = `<ol>${d.outline.map((sec) => `
+    <li>${esc(sec.heading)}<ol>${sec.points.map((pt) => `
+      <li>${esc(pt.text)}${pt.details.length ? `<ol>${pt.details.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}</li>`).join("")}
+    </ol></li>`).join("")}</ol>`;
+
+  $("p-words").innerHTML = `
+    <h2>핵심어</h2>
+    ${table(["용어", "설명"], d.keywords.map((k) => [k.term, k.explanation]))}
+    <h2 style="margin-top:24px">어휘</h2>
+    ${d.vocabulary.length ? table(["단어", "뜻", "원문"], d.vocabulary.map((v) => [v.word, v.meaning, v.context]), 2) : '<p class="empty">정리할 어휘가 없습니다.</p>'}`;
+
+  $("result").style.display = "block";
+  $("result").scrollIntoView({ behavior: "smooth" });
+}
+
+function table(head, rows, ctxCol = -1) {
+  return `<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) =>
+    `<tr>${r.map((c, i) => `<td${i === ctxCol ? ' class="ctx"' : ""}>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+function toMarkdown(d) {
+  const L = [`# ${d.title}`, "", `- **주제**: ${d.topic}`, `- **요지**: ${d.main_idea}`, "", `## 요약`, d.summary, "", `## 문단별 요약`];
+  d.paragraphs.forEach((p) => L.push(`${p.index}. [${p.role}] ${p.summary}`));
+  L.push("", "## 논리 흐름");
+  d.logic_flow.forEach((s) => L.push(`- **${s.type}**: ${s.content}${s.paragraphs.length ? ` (${s.paragraphs.join(", ")}문단)` : ""}`));
+  L.push("", "## 개요");
+  const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+  d.outline.forEach((sec, i) => {
+    L.push(`${roman[i] || i + 1}. ${sec.heading}`);
+    sec.points.forEach((pt, j) => { L.push(`   ${j + 1}. ${pt.text}`); pt.details.forEach((x) => L.push(`      - ${x}`)); });
+  });
+  L.push("", "## 핵심어");
+  d.keywords.forEach((k) => L.push(`- **${k.term}**: ${k.explanation}`));
+  if (d.vocabulary.length) {
+    L.push("", "## 어휘", "| 단어 | 뜻 | 원문 |", "|---|---|---|");
+    d.vocabulary.forEach((v) => L.push(`| ${v.word} | ${v.meaning} | ${v.context.replace(/\|/g, "\\|")} |`));
+  }
+  return L.join("\n");
+}
+
+$("copy-md").onclick = async () => {
+  await navigator.clipboard.writeText(toMarkdown(last));
+  $("copy-md").textContent = "복사됨 ✓";
+  setTimeout(() => ($("copy-md").textContent = "Markdown 복사"), 1500);
+};
+$("dl-json").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(last, null, 2)], { type: "application/json" }));
+  a.download = (last.title || "structure") + ".json";
+  a.click();
+};
+</script>
+</body>
+</html>
