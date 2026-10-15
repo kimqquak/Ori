@@ -40,9 +40,13 @@ STRUCTURE_SCHEMA = {
                 "properties": {
                     "type": {"type": "string", "enum": FLOW_TYPES},
                     "content": {"type": "string"},
-                    "paragraphs": {"type": "array", "items": {"type": "integer"}},
+                    "sentences": {
+                        "type": "array",
+                        "description": "근거가 된 원문 문장 번호 (예: \"2-1\")",
+                        "items": {"type": "string"},
+                    },
                 },
-                "required": ["type", "content", "paragraphs"],
+                "required": ["type", "content", "sentences"],
                 "additionalProperties": False,
             },
         },
@@ -106,8 +110,9 @@ STRUCTURE_SCHEMA = {
 SYSTEM_PROMPT = """너는 국어·영어 독해를 가르치는 선생님이다. 학생이 글의 구조를 한눈에 파악할 수 있도록 글을 분석한다.
 
 - 원문 언어와 관계없이 모든 설명은 한국어로 쓴다. 단, key_sentence와 vocabulary의 word/context는 원문 그대로 둔다.
-- 문단은 [1], [2] 처럼 번호가 붙어 주어진다. paragraphs에는 모든 문단을 빠짐없이 그 번호로 넣는다.
-- logic_flow는 글 전체의 논증 흐름(주장→근거→예시…)을 순서대로 정리하고, 각 항목이 어느 문단에서 나왔는지 번호로 표시한다. 논설문이 아닌 글(설명문, 서사 등)이면 중심 내용과 그것을 뒷받침하는 내용으로 흐름을 잡는다.
+- 문단은 [1], [2] 처럼, 문단 안의 문장은 {2-1}, {2-2} 처럼(2문단 1번째, 2번째 문장) 번호가 붙어 주어진다. paragraphs에는 모든 문단을 빠짐없이 그 번호로 넣는다.
+- logic_flow는 글 전체의 논증 흐름(주장→근거→예시…)을 순서대로 정리한다. 논설문이 아닌 글(설명문, 서사 등)이면 중심 내용과 그것을 뒷받침하는 내용으로 흐름을 잡는다.
+- logic_flow는 문장 단위로 뽑는다. 특히 근거와 예시는 원문 문장 하나가 한 항목이 되도록 나누고, 한 문단에 근거 문장이 여럿이면 각각 따로 항목을 만든다. 각 항목의 sentences에는 그 내용이 나온 원문 문장 번호(예: "2-1")를 넣는다. 번호는 주어진 것만 쓴다.
 - outline은 2~5개의 큰 항목으로 나누고, 원문에 없는 내용을 지어내지 않는다.
 - keywords는 글의 이해에 핵심인 용어 3~8개.
 - vocabulary는 영어 글이면 수준 있는 단어·숙어 5~12개, 국어 글이면 어려운 한자어·개념어 3~10개. 해당하는 것이 없으면 빈 배열."""
@@ -122,6 +127,21 @@ def split_paragraphs(text: str) -> list[str]:
     return parts
 
 
+_ABBREV = re.compile(r"(?:\b(?:Mr|Mrs|Ms|Dr|Prof|St|vs|etc|e\.g|i\.e|U\.S|No)\.|\b[A-Z]\.)$")
+
+
+def split_sentences(paragraph: str) -> list[str]:
+    """Split after . ! ? … (optionally followed by a closing quote/bracket), keeping common abbreviations intact."""
+    pieces = re.split(r"(?<=[.!?…])\s+|(?<=[.!?…][\"'”’)])\s+", paragraph.strip())
+    sentences: list[str] = []
+    for piece in pieces:
+        if sentences and _ABBREV.search(sentences[-1]):
+            sentences[-1] += " " + piece
+        elif piece:
+            sentences.append(piece)
+    return sentences
+
+
 class StructureError(Exception):
     pass
 
@@ -131,7 +151,11 @@ def structure_text(text: str, client: anthropic.Anthropic | None = None) -> dict
     if not paragraphs:
         raise StructureError("분석할 글이 비어 있습니다.")
 
-    numbered = "\n\n".join(f"[{i}] {p}" for i, p in enumerate(paragraphs, 1))
+    sentences = [split_sentences(p) for p in paragraphs]
+    numbered = "\n\n".join(
+        f"[{i}] " + " ".join(f"{{{i}-{j}}} {sent}" for j, sent in enumerate(sents, 1))
+        for i, sents in enumerate(sentences, 1)
+    )
     client = client or anthropic.Anthropic()
 
     with client.beta.messages.stream(
@@ -156,4 +180,5 @@ def structure_text(text: str, client: anthropic.Anthropic | None = None) -> dict
     raw = next(b.text for b in response.content if b.type == "text")
     result = json.loads(raw)
     result["source_paragraphs"] = paragraphs
+    result["source_sentences"] = sentences
     return result

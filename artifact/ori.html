@@ -89,7 +89,8 @@
   .flow li::before { content: ""; position: absolute; left: -23px; top: 9px; width: 12px; height: 12px; border-radius: 50%;
     background: var(--sheet); border: 3px solid var(--dot); }
   .flow .t { font-weight: 700; color: var(--dot); margin-right: 8px; }
-  .refs { color: var(--muted); font-size: 13px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .quote { margin: 6px 0 0; padding-left: 12px; border-left: 2px solid var(--rule); font-family: var(--f-display); color: var(--muted); }
+  .quote .sid { font: 600 12px var(--f-body); color: var(--dot); margin-right: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   .outline ol { margin: 4px 0; padding-left: 26px; }
   .outline > ol { list-style: upper-roman; padding-left: 34px; }
@@ -184,12 +185,12 @@ const SAMPLE_RESULT = {
     { index: 4, role: "결론", summary: "공부처럼 수면도 계획하라.", key_sentence: "Therefore, schedule sleep as you schedule study." },
   ],
   logic_flow: [
-    { type: "주장", content: "수면은 학습의 필수 요소다", paragraphs: [1] },
-    { type: "근거", content: "깊은 수면 중 기억이 장기 기억으로 굳어진다", paragraphs: [2] },
-    { type: "예시", content: "공부 후 잔 학생의 점수가 약 20% 높았던 연구", paragraphs: [2] },
-    { type: "반론", content: "밤샘은 공부 시간을 더 확보해 준다", paragraphs: [3] },
-    { type: "재반박", content: "벼락치기한 내용은 잘 남지 않아 얻은 시간이 다시 사라진다", paragraphs: [3] },
-    { type: "결론", content: "수면을 공부 계획에 포함하라", paragraphs: [4] },
+    { type: "주장", content: "수면은 학습의 필수 요소다", sentences: ["1-2"] },
+    { type: "근거", content: "깊은 수면 중 기억이 장기 기억으로 굳어진다", sentences: ["2-1"] },
+    { type: "예시", content: "공부 후 잔 학생의 점수가 약 20% 높았던 연구", sentences: ["2-2"] },
+    { type: "반론", content: "밤샘은 공부 시간을 더 확보해 준다", sentences: ["3-1"] },
+    { type: "재반박", content: "벼락치기한 내용은 잘 남지 않아 얻은 시간이 다시 사라진다", sentences: ["3-2"] },
+    { type: "결론", content: "수면을 공부 계획에 포함하라", sentences: ["4-1"] },
   ],
   outline: [
     { heading: "문제 제기와 주장", points: [{ text: "시험 전 수면을 먼저 줄이는 학생들", details: [] }, { text: "수면은 학습의 필수 요소", details: [] }] },
@@ -220,15 +221,28 @@ function splitParagraphs(text) {
   return parts;
 }
 
-function buildPrompt(paragraphs) {
-  const numbered = paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n\n");
+const ABBREV = /(?:\b(?:Mr|Mrs|Ms|Dr|Prof|St|vs|etc|e\.g|i\.e|U\.S|No)\.|\b[A-Z]\.)$/;
+
+// Split after . ! ? … (optionally followed by a closing quote/bracket), keeping common abbreviations intact.
+function splitSentences(paragraph) {
+  const out = [];
+  for (const piece of paragraph.trim().split(/(?<=[.!?…]["'”’)]?)\s+/)) {
+    if (out.length && ABBREV.test(out[out.length - 1])) out[out.length - 1] += " " + piece;
+    else if (piece) out.push(piece);
+  }
+  return out;
+}
+
+function buildPrompt(sentences) {
+  const numbered = sentences.map((ss, i) => `[${i + 1}] ` + ss.map((t, j) => `{${i + 1}-${j + 1}} ${t}`).join(" ")).join("\n\n");
   return `너는 국어·영어 독해를 가르치는 선생님이다. 학생이 글의 구조를 한눈에 파악할 수 있도록 아래 글을 분석해라.
 
 규칙:
 - 원문 언어와 관계없이 모든 설명은 한국어로 쓴다. 단, key_sentence와 vocabulary의 word/context는 원문 그대로 둔다.
-- 문단에는 [1], [2]처럼 번호가 붙어 있다. paragraphs에는 모든 문단(총 ${paragraphs.length}개)을 빠짐없이 그 번호로 넣는다.
+- 문단에는 [1], [2]처럼, 문단 안의 문장에는 {2-1}, {2-2}처럼(2문단 1번째, 2번째 문장) 번호가 붙어 있다. paragraphs에는 모든 문단(총 ${sentences.length}개)을 빠짐없이 그 번호로 넣는다.
 - paragraphs[].role은 다음 중 하나: 도입, 문제 제기, 주장, 근거, 예시, 부연, 반론, 재반박, 전환, 결론
-- logic_flow는 글 전체의 논증 흐름을 순서대로 정리한다. type은 주장, 근거, 예시, 반론, 재반박, 결론 중 하나. paragraphs에는 그 내용이 나온 문단 번호를 넣는다. 논설문이 아니면(설명문, 서사 등) 중심 내용과 그것을 뒷받침하는 내용으로 흐름을 잡는다.
+- logic_flow는 글 전체의 논증 흐름을 순서대로 정리한다. type은 주장, 근거, 예시, 반론, 재반박, 결론 중 하나. 논설문이 아니면(설명문, 서사 등) 중심 내용과 그것을 뒷받침하는 내용으로 흐름을 잡는다.
+- logic_flow는 문장 단위로 뽑는다. 특히 근거와 예시는 원문 문장 하나가 한 항목이 되도록 나누고, 한 문단에 근거 문장이 여럿이면 각각 따로 항목을 만든다. sentences에는 그 내용이 나온 원문 문장 번호(예: "2-1")를 넣는다. 번호는 주어진 것만 쓴다.
 - outline은 2~5개의 큰 항목(heading), 각 항목 아래 points(text와 details 배열). 원문에 없는 내용은 지어내지 않는다.
 - keywords는 글 이해에 핵심인 용어 3~8개(이 글에서의 의미/역할 설명).
 - vocabulary는 영어 글이면 수준 있는 단어·숙어 5~12개, 국어 글이면 어려운 한자어·개념어 3~10개. 없으면 빈 배열.
@@ -236,7 +250,7 @@ function buildPrompt(paragraphs) {
 다른 말 없이 아래 형태의 JSON 객체 하나만 답해라:
 {"title": "글에 어울리는 짧은 제목", "topic": "주제(명사구)", "main_idea": "요지 한 문장", "summary": "3~4문장 요약",
  "paragraphs": [{"index": 1, "role": "주장", "summary": "문단 핵심 한 줄", "key_sentence": "원문 중심 문장"}],
- "logic_flow": [{"type": "주장", "content": "...", "paragraphs": [1]}],
+ "logic_flow": [{"type": "근거", "content": "...", "sentences": ["2-1"]}],
  "outline": [{"heading": "...", "points": [{"text": "...", "details": ["..."]}]}],
  "keywords": [{"term": "...", "explanation": "..."}],
  "vocabulary": [{"word": "...", "meaning": "한국어 뜻", "context": "원문 구절"}]}
@@ -291,9 +305,11 @@ $("go").onclick = async () => {
   $("go").disabled = true; $("stop").hidden = false;
   setStatus('<span class="spinner"></span>분석 중이에요. 글 길이에 따라 30초~1분 정도 걸려요.');
   try {
-    const data = await sample.json(buildPrompt(paragraphs), { signal: ctl.signal, modelTier: "default" });
+    const sentences = paragraphs.map(splitSentences);
+    const data = await sample.json(buildPrompt(sentences), { signal: ctl.signal, modelTier: "default" });
     if (!data || typeof data !== "object" || !Array.isArray(data.paragraphs)) throw { code: "invalid_json" };
     data.source_paragraphs = paragraphs;
+    data.source_sentences = sentences;
     last = data;
     $("sample-note").hidden = true;
     render(data);
@@ -329,7 +345,8 @@ function render(d) {
   const flow = arr(d.logic_flow);
   $("p-flow").innerHTML = flow.length ? `<ol class="flow">${flow.map((s) => `
     <li style="--dot: var(${FLOW_COLOR[s.type] || "--accent"})">
-      <span class="t">${esc(s.type)}</span>${esc(s.content)}${arr(s.paragraphs).length ? `<span class="refs">${arr(s.paragraphs).map(esc).join(", ")}문단</span>` : ""}
+      <span class="t">${esc(s.type)}</span>${esc(s.content)}
+      ${quotes(d, s.sentences).map((q) => `<p class="quote"><span class="sid">${esc(q.label)}</span>${esc(q.text)}</p>`).join("")}
     </li>`).join("")}</ol>` : '<p class="empty">논리 흐름이 없어요.</p>';
 
   $("p-outline").innerHTML = `<ol>${arr(d.outline).map((sec) => `
@@ -345,6 +362,15 @@ function render(d) {
     ${voc.length ? table(["단어", "뜻", "원문"], voc.map((v) => [v.word, v.meaning, v.context]), 2) : '<p class="empty">정리할 어휘가 없어요.</p>'}`;
 }
 
+// "2-1" -> {label: "2문단 1문장", text: <원문 문장>}; unknown ids are dropped
+function quotes(d, ids) {
+  return arr(ids).map((id) => {
+    const m = String(id).match(/(\d+)\D+(\d+)/);
+    const text = m && arr(arr(d.source_sentences)[m[1] - 1])[m[2] - 1];
+    return text ? { label: `${m[1]}문단 ${m[2]}문장`, text } : null;
+  }).filter(Boolean);
+}
+
 function table(head, rows, ctxCol = -1) {
   return `<div class="tbl"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) =>
     `<tr>${r.map((c, i) => `<td${i === ctxCol ? ' class="ctx"' : ""}>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
@@ -355,7 +381,10 @@ function toMarkdown(d) {
   const L = [`# ${d.title}`, "", `- **주제**: ${d.topic}`, `- **요지**: ${d.main_idea}`, "", "## 요약", d.summary, "", "## 문단별 요약"];
   arr(d.paragraphs).forEach((p) => L.push(`${p.index}. [${p.role}] ${p.summary}`));
   L.push("", "## 논리 흐름");
-  arr(d.logic_flow).forEach((s) => L.push(`- **${s.type}**: ${s.content}${arr(s.paragraphs).length ? ` (${s.paragraphs.join(", ")}문단)` : ""}`));
+  arr(d.logic_flow).forEach((s) => {
+    L.push(`- **${s.type}**: ${s.content}`);
+    quotes(d, s.sentences).forEach((q) => L.push(`  > (${q.label}) ${q.text}`));
+  });
   L.push("", "## 개요");
   const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
   arr(d.outline).forEach((sec, i) => {
@@ -379,5 +408,6 @@ async function copy(btn, text, label) {
 $("copy-md").onclick = (e) => copy(e.currentTarget, toMarkdown(last), "Markdown 복사");
 $("copy-json").onclick = (e) => copy(e.currentTarget, JSON.stringify(last, null, 2), "JSON 복사");
 
+SAMPLE_RESULT.source_sentences = SAMPLE_RESULT.source_paragraphs.map(splitSentences);
 render(SAMPLE_RESULT);
 </script>

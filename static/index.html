@@ -61,6 +61,8 @@
     background: var(--dot, var(--accent)); }
   .step .t { font-weight: 700; color: var(--dot); margin-right: 6px; }
   .refs { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .quote { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 15px; }
+  .quote .sid { font-size: 12px; font-weight: 600; color: var(--dot); margin-right: 6px; font-variant-numeric: tabular-nums; }
   .outline ol { margin: 4px 0; padding-left: 26px; }
   .outline > ol { list-style: upper-roman; padding-left: 30px; }
   .outline > ol > li { font-weight: 700; margin-bottom: 8px; }
@@ -175,7 +177,7 @@ function render(d) {
   $("p-flow").innerHTML = d.logic_flow.length ? `<div class="flow">${d.logic_flow.map((s) => `
     <div class="step" style="--dot: var(${FLOW_COLOR[s.type] || "--accent"})">
       <span class="t">${esc(s.type)}</span>${esc(s.content)}
-      ${s.paragraphs.length ? `<span class="refs">[${s.paragraphs.join(", ")}문단]</span>` : ""}
+      ${quotes(d, s.sentences).map((q) => `<p class="quote"><span class="sid">${esc(q.label)}</span>${esc(q.text)}</p>`).join("")}
     </div>`).join("")}</div>` : '<p class="empty">논리 흐름 없음</p>';
 
   $("p-outline").innerHTML = `<ol>${d.outline.map((sec) => `
@@ -193,6 +195,15 @@ function render(d) {
   $("result").scrollIntoView({ behavior: "smooth" });
 }
 
+// "2-1" -> {label: "2문단 1문장", text: <원문 문장>}; unknown ids are dropped
+function quotes(d, ids) {
+  return (ids || []).map((id) => {
+    const m = String(id).match(/(\d+)\D+(\d+)/);
+    const text = m && d.source_sentences?.[m[1] - 1]?.[m[2] - 1];
+    return text ? { label: `${m[1]}문단 ${m[2]}문장`, text } : null;
+  }).filter(Boolean);
+}
+
 function table(head, rows, ctxCol = -1) {
   return `<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) =>
     `<tr>${r.map((c, i) => `<td${i === ctxCol ? ' class="ctx"' : ""}>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
@@ -202,7 +213,10 @@ function toMarkdown(d) {
   const L = [`# ${d.title}`, "", `- **주제**: ${d.topic}`, `- **요지**: ${d.main_idea}`, "", `## 요약`, d.summary, "", `## 문단별 요약`];
   d.paragraphs.forEach((p) => L.push(`${p.index}. [${p.role}] ${p.summary}`));
   L.push("", "## 논리 흐름");
-  d.logic_flow.forEach((s) => L.push(`- **${s.type}**: ${s.content}${s.paragraphs.length ? ` (${s.paragraphs.join(", ")}문단)` : ""}`));
+  d.logic_flow.forEach((s) => {
+    L.push(`- **${s.type}**: ${s.content}`);
+    quotes(d, s.sentences).forEach((q) => L.push(`  > (${q.label}) ${q.text}`));
+  });
   L.push("", "## 개요");
   const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
   d.outline.forEach((sec, i) => {
