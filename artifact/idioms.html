@@ -1,0 +1,370 @@
+<title>Ori 숙어 해석기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,600;1,400&display=swap">
+<style>
+  /* Layout: 사전 펼침면 — 찾기·목록(왼쪽) · 풀이(오른쪽), 세로 화면에서는 위아래로 쌓임 */
+  :root {
+    --paper: #f4f3ef; --sheet: #ffffff; --ink: #1d1f22; --muted: #62676d; --rule: #dedbd3;
+    --accent: #8a3b2e; --accent-soft: #f4e6e2; --mark: #fff1b8; --err: #b23a3a;
+    --f-display: "Gowun Batang", "Nanum Myeongjo", "AppleMyungjo", serif;
+    --f-en: "Source Serif 4", Georgia, serif;
+    --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #141413; --sheet: #1d1c1a; --ink: #ebe8e1; --muted: #a29d94; --rule: #33302b;
+      --accent: #e6957f; --accent-soft: #3a2621; --mark: #4a4020; --err: #ec8b84;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #141413; --sheet: #1d1c1a; --ink: #ebe8e1; --muted: #a29d94; --rule: #33302b;
+    --accent: #e6957f; --accent-soft: #3a2621; --mark: #4a4020; --err: #ec8b84;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink); font: 17px/1.7 var(--f-body); margin: 0; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding-block: 24px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font: 700 30px/1.2 var(--f-display); margin: 0; }
+  header p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .spread { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .spread { grid-template-columns: minmax(0, 1fr); } }
+  .sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 20px; min-width: 0; }
+  .side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+  @media (max-width: 860px) { .side { position: static; } }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+
+  .search { display: flex; gap: 8px; }
+  .search { align-items: stretch; }
+  .search textarea { flex: 1; min-width: 0; min-height: 76px; padding: 12px 14px; font: 18px/1.5 var(--f-body);
+    border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); resize: vertical; }
+  textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { font: 600 17px var(--f-body); min-height: 52px; padding: 0 20px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--sheet); touch-action: manipulation; }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--rule); font-weight: 500; min-height: 44px; font-size: 15px; padding: 0 14px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .hint { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+  .status { margin-top: 10px; font-size: 15px; color: var(--muted); min-height: 1.5em; }
+  .status.err { color: var(--err); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--rule); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+  .tabs { display: flex; gap: 4px; margin: 22px 0 10px; border-bottom: 1px solid var(--rule); }
+  .tab { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); border-radius: 0;
+    min-height: 44px; padding: 0 12px; font-weight: 600; font-size: 15px; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .list { list-style: none; margin: 0; padding: 0; max-height: 52vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  @media (max-width: 860px) { .list { max-height: 320px; } }
+  .list li + li { border-top: 1px solid var(--rule); }
+  .list button { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 10px 6px; cursor: pointer; min-height: 52px; }
+  .list button:focus-visible { outline: 2px solid var(--accent); }
+  .list .en { font: 600 17px/1.35 var(--f-en); display: block; }
+  .list .ko { color: var(--muted); font-size: 14px; display: block; }
+  .empty { color: var(--muted); font-size: 15px; padding: 10px 0; }
+
+  .entry h2 { font: 600 34px/1.2 var(--f-en); margin: 0 0 6px; overflow-wrap: anywhere; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tag { font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .tag.plain { background: var(--paper); color: var(--muted); }
+  .meaning { font: 700 24px/1.45 var(--f-display); margin: 0 0 6px; }
+  .literal { color: var(--muted); font-size: 15px; margin: 0 0 18px; }
+  .ctx { background: var(--mark); padding: 12px 14px; border-radius: 6px; margin: 0 0 18px; }
+  .ctx b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  .entry h3 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; font-weight: 600; }
+  .entry p { margin: 0; }
+  .ex { list-style: none; padding: 0; margin: 0; }
+  .ex li { padding: 10px 0; border-top: 1px solid var(--rule); }
+  .ex li:first-child { border-top: 0; padding-top: 0; }
+  .ex .en { font: italic 400 18px/1.5 var(--f-en); display: block; }
+  .ex .ko { color: var(--muted); font-size: 15px; display: block; }
+  .sim { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sim button { all: unset; cursor: pointer; border: 1px solid var(--rule); border-radius: 6px; padding: 8px 12px; min-height: 44px; box-sizing: border-box; }
+  .sim button:focus-visible { outline: 2px solid var(--accent); }
+  .sim .en { font: 600 16px var(--f-en); display: block; }
+  .sim .ko { font-size: 13px; color: var(--muted); display: block; }
+  .entry-actions { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+  .entry h2.sm { font-size: 26px; }
+  .item + .item { border-top: 2px solid var(--rule); margin-top: 28px; padding-top: 24px; }
+  .sent { margin-bottom: 26px; padding-bottom: 20px; border-bottom: 2px solid var(--rule); }
+  .src-en { font: italic 400 21px/1.5 var(--f-en); margin: 0 0 8px; overflow-wrap: anywhere; }
+  .tr { font: 700 21px/1.55 var(--f-display); margin: 0; }
+  .found { font-size: 14px; color: var(--muted); margin: 12px 0 0; }
+  .note { font-size: 14px; color: var(--muted); margin-top: 16px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>숙어 해석기</h1>
+    <p>영어 숙어나 숙어가 섞인 문장을 넣으면 뜻·뉘앙스·예문을 한국어로 풀어 줘요.</p>
+  </header>
+
+  <div class="spread">
+    <aside class="sheet side">
+      <p class="label">숙어 찾기</p>
+      <form class="search" id="form" autocomplete="off">
+        <textarea id="q" rows="2" enterkeyhint="search" autocapitalize="none" spellcheck="false"
+          placeholder="숙어나 문장을 넣어 보세요&#10;예: break the ice / It just pays to be a little paranoid." aria-label="영어 숙어나 문장"></textarea>
+        <button id="go" type="submit">해석</button>
+      </form>
+      <p class="hint">문장을 통째로 넣으면 문장 번역과 그 안의 숙어를 모두 찾아 풀이해 줘요.</p>
+      <div class="status" id="status" role="status"></div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-list="common">자주 쓰는 숙어</button>
+        <button class="tab" role="tab" aria-selected="false" data-list="recent">최근 찾은 것</button>
+      </div>
+      <ul class="list" id="list"></ul>
+    </aside>
+
+    <main class="sheet entry" id="entry" aria-live="polite"></main>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const arr = (x) => (Array.isArray(x) ? x : []);
+const norm = (s) => String(s).toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ").trim();
+const RECENT_KEY = "ori-idioms-recent";
+
+// 기본 수록 숙어: Claude 없이도 바로 볼 수 있는 짧은 풀이
+const BUILTIN = [
+  ["break the ice", "어색한 분위기를 깨다", "처음 만난 자리에서 대화를 시작해 긴장을 풀 때", "He told a joke to break the ice.", "그는 어색함을 깨려고 농담을 했다."],
+  ["piece of cake", "식은 죽 먹기, 아주 쉬운 일", "구어, 시험·일이 쉬웠다고 할 때", "The test was a piece of cake.", "시험은 식은 죽 먹기였다."],
+  ["hit the books", "열심히 공부하다", "구어, 특히 시험 전에", "I have to hit the books tonight.", "오늘 밤엔 공부해야 해."],
+  ["under the weather", "몸이 좀 안 좋은", "가벼운 감기·피로 등에", "I'm feeling a bit under the weather.", "몸이 좀 안 좋아."],
+  ["cost an arm and a leg", "엄청나게 비싸다", "과장된 구어 표현", "That car cost an arm and a leg.", "그 차는 엄청 비쌌다."],
+  ["let the cat out of the bag", "(무심코) 비밀을 누설하다", "실수로 말해 버렸다는 느낌", "She let the cat out of the bag about the party.", "그녀가 파티 얘기를 무심코 말해 버렸다."],
+  ["once in a blue moon", "아주 드물게", "가끔조차 아니고 정말 드물 때", "I eat fast food once in a blue moon.", "패스트푸드는 아주 가끔 먹어."],
+  ["hit the nail on the head", "정확히 맞는 말을 하다, 핵심을 찌르다", "칭찬하는 맥락", "You hit the nail on the head.", "정확히 짚었어."],
+  ["bite the bullet", "(싫지만) 이를 악물고 하다", "피할 수 없는 일을 받아들일 때", "I bit the bullet and went to the dentist.", "꾹 참고 치과에 갔다."],
+  ["call it a day", "(오늘 일을) 그만 끝내다", "일·작업을 마무리할 때", "Let's call it a day.", "오늘은 여기까지 하자."],
+  ["get cold feet", "(막상 하려니) 겁이 나다, 주저하다", "결혼·발표 직전 등", "He got cold feet before the speech.", "그는 연설 직전에 겁을 먹었다."],
+  ["on the same page", "같은 생각이다, 이해가 일치하다", "업무·팀 대화에서 자주", "Let's make sure we're on the same page.", "우리 생각이 같은지 확인하자."],
+  ["the ball is in your court", "이제 네가 결정할 차례다", "상대에게 결정권을 넘길 때", "I made my offer. The ball is in your court.", "난 제안했어. 이제 네 차례야."],
+  ["beat around the bush", "말을 돌리다, 요점을 피하다", "보통 부정형 Don't ~ 로", "Stop beating around the bush.", "말 돌리지 마."],
+  ["spill the beans", "비밀을 털어놓다", "구어, 가벼운 비밀", "Come on, spill the beans!", "어서 털어놔!"],
+  ["a blessing in disguise", "전화위복", "처음엔 나빠 보였지만 결국 좋은 일", "Losing that job was a blessing in disguise.", "그 일자리를 잃은 게 전화위복이었다."],
+  ["kill two birds with one stone", "일석이조, 한 번에 두 가지를 해내다", "", "I killed two birds with one stone.", "일석이조였다."],
+  ["see eye to eye", "의견이 일치하다", "흔히 부정문으로", "We don't always see eye to eye.", "우리가 늘 의견이 같은 건 아니다."],
+  ["keep an eye on", "~을 지켜보다, 봐 주다", "", "Can you keep an eye on my bag?", "내 가방 좀 봐 줄래?"],
+  ["give someone the cold shoulder", "~를 쌀쌀맞게 대하다, 무시하다", "", "She gave me the cold shoulder.", "그녀는 나를 쌀쌀맞게 대했다."],
+  ["get the hang of", "~의 요령을 터득하다", "새로운 것에 익숙해질 때", "You'll get the hang of it soon.", "곧 요령이 생길 거야."],
+  ["in hot water", "곤경에 처한, 혼날 상황인", "", "He's in hot water with his boss.", "그는 상사에게 찍혔다."],
+  ["miss the boat", "기회를 놓치다", "", "If you don't apply now, you'll miss the boat.", "지금 지원 안 하면 기회를 놓칠 거야."],
+  ["pull someone's leg", "~를 놀리다, 농담하다", "", "Relax, I'm just pulling your leg.", "진정해, 그냥 놀린 거야."],
+  ["face the music", "(잘못에 대한) 결과를 받아들이다", "", "It's time to face the music.", "이제 책임을 질 때다."],
+  ["burn the midnight oil", "밤늦게까지 일하다·공부하다", "", "She burned the midnight oil before the exam.", "그녀는 시험 전 밤샘 공부를 했다."],
+  ["go the extra mile", "기대 이상으로 애쓰다", "칭찬하는 맥락", "He always goes the extra mile for customers.", "그는 늘 손님을 위해 한 발 더 뛴다."],
+  ["on thin ice", "아슬아슬한 처지인", "한 번 더 잘못하면 큰일 날 때", "You're on thin ice.", "너 지금 아슬아슬해."],
+  ["break a leg", "행운을 빌어 (공연 전 인사)", "무대·발표 앞둔 사람에게", "Break a leg tonight!", "오늘 밤 잘해!"],
+  ["the last straw", "더는 참을 수 없게 만든 마지막 일", "", "That was the last straw.", "그게 결정타였다."],
+  ["take it easy", "쉬엄쉬엄 해, 진정해", "작별 인사로도", "Take it easy!", "무리하지 마!"],
+  ["out of the blue", "갑자기, 난데없이", "", "He called me out of the blue.", "그가 난데없이 전화했다."],
+  ["make ends meet", "근근이 먹고살다, 수입으로 생활을 꾸려 가다", "", "They work two jobs to make ends meet.", "그들은 먹고살려고 두 가지 일을 한다."],
+  ["up in the air", "아직 결정되지 않은", "", "Our plans are still up in the air.", "계획은 아직 미정이다."],
+  ["by the skin of one's teeth", "간신히, 가까스로", "", "I passed by the skin of my teeth.", "간신히 통과했다."],
+  ["sit on the fence", "중립을 지키다, 결정을 미루다", "약간 부정적 뉘앙스", "You can't sit on the fence forever.", "언제까지나 관망할 순 없어."],
+  ["throw in the towel", "포기하다, 패배를 인정하다", "권투에서 유래", "Don't throw in the towel yet.", "아직 포기하지 마."],
+  ["get out of hand", "통제할 수 없게 되다", "", "The party got out of hand.", "파티가 걷잡을 수 없게 됐다."],
+  ["a dime a dozen", "흔해 빠진, 아주 흔한", "", "Cheap umbrellas are a dime a dozen.", "싸구려 우산은 흔해 빠졌다."],
+  ["speak of the devil", "호랑이도 제 말 하면 온다더니", "말하던 사람이 나타났을 때", "Speak of the devil—here he comes.", "호랑이도 제 말 하면 온다더니, 저기 오네."],
+].map(([idiom, meaning, nuance, en, ko]) => ({ idiom, meaning_ko: meaning, nuance, examples: [{ en, ko }], builtin: true }));
+
+const ERRORS = {
+  not_granted: "Claude 사용이 허용되지 않았어요. 페이지를 새로 고친 뒤 허용을 눌러 주세요.",
+  sampling_disabled: "이 계정에서는 Claude를 쓸 수 없어요.",
+  rate_limited: "요청이 많거나 사용 한도에 도달했어요. 잠시 후 다시 시도해 주세요.",
+  session_expired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+  prompt_too_large: "입력이 너무 길어요. 줄여서 넣어 주세요.",
+  refused: "이 표현은 풀이할 수 없다는 답을 받았어요.",
+  invalid_json: "결과 형식이 깨졌어요. 한 번 더 눌러 주세요.",
+};
+
+let sample = null;
+let ctl = null;
+let current = null;
+const samplePromise = (window.claude?.use ? window.claude.use("sample") : Promise.resolve(null))
+  .catch(() => null).then((s) => (sample = s));
+
+function setStatus(html, isErr = false) {
+  $("status").className = "status" + (isErr ? " err" : "");
+  $("status").innerHTML = html;
+}
+
+// ---- recent ----
+function loadRecent() { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } }
+function saveRecent(entry) {
+  const list = [entry, ...loadRecent().filter((e) => norm(e.idiom) !== norm(entry.idiom))].slice(0, 50);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch {}
+}
+
+// ---- side list ----
+let listMode = "common";
+function renderList() {
+  const q = norm($("q").value);
+  let items = listMode === "common" ? BUILTIN : loadRecent();
+  if (q) items = items.filter((e) => norm(e.idiom).includes(q) || String(e.meaning_ko).includes($("q").value.trim()));
+  $("list").innerHTML = items.length
+    ? items.map((e, i) => `<li><button data-i="${i}"><span class="en">${esc(e.idiom)}</span><span class="ko">${esc(e.meaning_ko)}</span></button></li>`).join("")
+    : `<li class="empty">${listMode === "recent" && !q ? "아직 찾은 숙어가 없어요." : "목록에 없어요. ‘해석’을 누르면 Claude가 풀어 줘요."}</li>`;
+  $("list").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    const e = items[+b.dataset.i];
+    $("q").value = e.idiom;
+    showEntry(e);
+    scrollToEntry();
+  }));
+}
+document.querySelectorAll(".tab").forEach((t) => (t.onclick = () => {
+  listMode = t.dataset.list;
+  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === t)));
+  renderList();
+}));
+$("q").addEventListener("input", renderList);
+
+function scrollToEntry() {
+  if (window.innerWidth <= 860) $("entry").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---- result ----
+// 결과 하나 = { translation?: 문장 번역, items: [숙어 풀이…] }
+function entryHTML(d, i, many) {
+  const tags = [d.register, ...arr(d.labels)].filter(Boolean);
+  return `<article class="item" data-i="${i}">
+    ${many ? `<h2 class="sm">${esc(d.idiom)}</h2>` : `<h2>${esc(d.idiom)}</h2>`}
+    ${tags.length ? `<div class="tags">${tags.map((t, j) => `<span class="tag${j ? " plain" : ""}">${esc(t)}</span>`).join("")}</div>` : ""}
+    <p class="meaning">${esc(d.meaning_ko)}</p>
+    ${d.literal_ko ? `<p class="literal">직역: ${esc(d.literal_ko)}</p>` : '<div style="height:12px"></div>'}
+    ${d.context_meaning ? `<div class="ctx"><b>이 문장에서는</b>${esc(d.context_meaning)}</div>` : ""}
+    ${d.nuance ? `<h3>뉘앙스·쓰임</h3><p>${esc(d.nuance)}</p>` : ""}
+    ${d.origin ? `<h3>유래</h3><p>${esc(d.origin)}</p>` : ""}
+    ${arr(d.examples).length ? `<h3>예문</h3><ul class="ex">${d.examples.map((x) =>
+      `<li><span class="en">${esc(x.en)}</span><span class="ko">${esc(x.ko)}</span></li>`).join("")}</ul>` : ""}
+    ${arr(d.similar).length ? `<h3>비슷한 표현</h3><div class="sim">${d.similar.map((s) =>
+      `<button data-q="${esc(s.expr)}"><span class="en">${esc(s.expr)}</span><span class="ko">${esc(s.meaning_ko)}</span></button>`).join("")}</div>` : ""}
+    <div class="entry-actions">
+      ${d.builtin ? `<button class="more">Claude로 자세히 보기</button>` : ""}
+      <button class="ghost copy">복사</button>
+    </div>
+    ${d.builtin ? '<p class="note">기본 수록 풀이예요. 유래·비슷한 표현까지 보려면 ‘자세히 보기’를 누르세요.</p>' : ""}
+  </article>`;
+}
+
+function showResult(r) {
+  const items = arr(r.items);
+  const many = items.length > 1 || !!r.translation;
+  $("entry").innerHTML = `
+    ${r.translation ? `<section class="sent"><p class="label">문장 해석</p>
+      <p class="src-en">${esc(r.sentence)}</p><p class="tr">${esc(r.translation)}</p>
+      ${items.length ? `<p class="found">숙어·관용 표현 ${items.length}개</p>` : '<p class="found">따로 풀이할 숙어는 없어요.</p>'}</section>` : ""}
+    ${items.map((d, i) => entryHTML(d, i, many)).join("")}`;
+  $("entry").querySelectorAll(".item").forEach((el) => {
+    const d = items[+el.dataset.i];
+    el.querySelectorAll(".sim button").forEach((b) => (b.onclick = () => { $("q").value = b.dataset.q; lookup(); }));
+    el.querySelector(".more")?.addEventListener("click", () => { $("q").value = d.idiom; lookup(); });
+    el.querySelector(".copy").onclick = async (e) => {
+      const btn = e.currentTarget;
+      const text = (r.translation ? `${r.sentence}\n→ ${r.translation}\n\n` : "") + toText(d);
+      try { await navigator.clipboard.writeText(text); btn.textContent = "복사했어요"; } catch { btn.textContent = "복사 안 됨"; }
+      setTimeout(() => (btn.textContent = "복사"), 1500);
+    };
+  });
+}
+const showEntry = (d) => showResult({ items: [d] });
+
+function toText(d) {
+  const L = [d.idiom, `뜻: ${d.meaning_ko}`];
+  if (d.literal_ko) L.push(`직역: ${d.literal_ko}`);
+  if (d.context_meaning) L.push(`문장 속 뜻: ${d.context_meaning}`);
+  if (d.nuance) L.push(`뉘앙스: ${d.nuance}`);
+  if (d.origin) L.push(`유래: ${d.origin}`);
+  arr(d.examples).forEach((x) => L.push(`- ${x.en}\n  ${x.ko}`));
+  if (arr(d.similar).length) L.push("비슷한 표현: " + d.similar.map((s) => `${s.expr}(${s.meaning_ko})`).join(", "));
+  return L.join("\n");
+}
+
+function buildPrompt(q) {
+  return `너는 한국 학생에게 영어 숙어를 가르치는 선생님이다. 아래 입력을 보고 한국어로 풀이해라.
+
+입력은 두 가지 중 하나다.
+(가) 숙어·관용구·구동사 하나 (예: "break the ice", "pay off"). 철자가 조금 틀렸으면 가장 가까운 숙어로 바로잡는다.
+(나) 숙어가 섞인 문장 (예: "It just pays to be a little paranoid (but not a lot)."). 이때는
+   - translation에 문장 전체의 자연스러운 한국어 번역을 쓴다.
+   - 문장 속 숙어·관용 표현·구동사·패턴(예: "it pays to + 동사", "but not a lot"처럼 단어 뜻만으로는 이해하기 어려운 것, 문맥상 원래 뜻과 다르게 쓰인 단어 포함)을 모두 찾아 items에 하나씩 넣는다. idiom에는 사전에 실리는 기본형으로 쓴다 (예: "it pays to do something").
+   - 각 item의 context_meaning에 이 문장에서 그 표현이 어떤 뜻·역할인지 쓴다.
+   - 쉬운 일반 단어는 넣지 않는다. 풀이할 것이 없으면 items는 빈 배열.
+(가)이면 translation은 빈 문자열, items는 1개, context_meaning은 빈 문자열.
+영어가 아니거나 뜻을 알 수 없으면 found를 false로 하고 translation에 이유를 짧게 쓴다.
+
+각 item:
+- meaning_ko: 자연스러운 한국어 뜻 (비슷한 한국어 속담·관용구가 있으면 함께). 뜻이 여럿이면 "1. … 2. …" 식으로.
+- literal_ko: 단어 그대로의 직역. 직역과 뜻이 같으면 빈 문자열.
+- register: "구어", "일상", "격식", "비속어", "문어" 중 하나.
+- labels: 미국식/영국식, 다소 낡은 표현, 흔함 등 붙일 만한 꼬리표 0~3개.
+- nuance: 언제·누구에게·어떤 기분으로 쓰는지, 주의할 점 2~3문장.
+- origin: 알려진 유래 1~2문장. 확실하지 않으면 빈 문자열(지어내지 말 것).
+- examples: 일상적인 예문 (가)이면 3개, (나)이면 2개, 각각 자연스러운 한국어 번역.
+- similar: 비슷하거나 반대 뜻의 영어 표현 2~4개.
+
+다른 말 없이 아래 형태의 JSON 객체 하나만 답해라:
+{"found": true, "translation": "...", "items": [{"idiom": "...", "meaning_ko": "...", "literal_ko": "...", "register": "구어", "labels": ["..."], "nuance": "...", "origin": "...",
+ "examples": [{"en": "...", "ko": "..."}], "similar": [{"expr": "...", "meaning_ko": "..."}], "context_meaning": "..."}]}
+
+<input>${q}</input>`;
+}
+
+async function lookup() {
+  const q = $("q").value.replace(/\s+/g, " ").trim().slice(0, 1500);
+  if (!q) { setStatus("숙어나 문장을 입력해 주세요.", true); $("q").focus(); return; }
+
+  await samplePromise;
+  if (!sample) {
+    const hit = BUILTIN.find((e) => norm(e.idiom) === norm(q));
+    if (hit) { showEntry(hit); setStatus("기본 수록 풀이를 보여 드려요. claude.ai에 로그인한 상태로 열면 어떤 숙어든 풀이할 수 있어요."); }
+    else setStatus("이 화면에서는 Claude를 쓸 수 없어요. claude.ai에 로그인한 상태로 열어 주세요. 왼쪽 목록의 숙어는 바로 볼 수 있어요.", true);
+    return;
+  }
+
+  ctl?.abort();
+  ctl = new AbortController();
+  const mine = ctl;
+  $("go").disabled = true;
+  const isSentence = q.split(" ").length > 6 || /[.?!]$/.test(q);
+  setStatus(`<span class="spinner"></span>풀이 중이에요. ${isSentence ? "문장은 20~30초" : "보통 10초 안팎"} 걸려요.`);
+  try {
+    const r = await sample.json(buildPrompt(q), { signal: mine.signal, modelTier: isSentence ? "default" : "quick" });
+    if (!r || typeof r !== "object") throw { code: "invalid_json" };
+    if (r.found === false) { setStatus(esc(r.translation || "풀이할 수 없는 입력이에요."), true); return; }
+    const items = arr(r.items).filter((d) => d && d.idiom && d.meaning_ko);
+    if (!items.length && !r.translation) throw { code: "invalid_json" };
+    r.items = items;
+    if (r.translation) r.sentence = q;
+    showResult(r);
+    items.forEach((d) => saveRecent(d));
+    renderList();
+    const fixed = !r.translation && items[0] && norm(items[0].idiom) !== norm(q);
+    setStatus(fixed ? `‘${esc(q)}’ → ‘${esc(items[0].idiom)}’(으)로 찾았어요.` : "");
+    scrollToEntry();
+  } catch (e) {
+    if (e?.code === "cancelled") return;
+    setStatus(ERRORS[e?.code] || "연결에 문제가 있었어요. 다시 시도해 주세요.", true);
+  } finally {
+    if (ctl === mine) { $("go").disabled = false; ctl = null; }
+  }
+}
+
+$("form").addEventListener("submit", (e) => { e.preventDefault(); $("q").blur(); lookup(); });
+$("q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); }
+});
+
+renderList();
+showEntry(BUILTIN[0]);
+</script>

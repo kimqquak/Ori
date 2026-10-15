@@ -35,3 +35,12 @@ uvicorn app:app --reload
 글 분석은 내 Claude 계정 사용량으로 처리되며, 처음 쓸 때 Claude 사용을 허용할지 묻습니다.
 
 - 링크: https://claude.ai/artifact/6WW7eb8HUUJLUHUu3GMdAf
+
+## 숙어 해석기 (태블릿용)
+
+`artifact/idioms.html`은 영어 숙어 풀이 화면입니다. 숙어를 넣으면 한국어 뜻, 직역, 뉘앙스·쓰임, 유래, 예문 3개, 비슷한 표현을 보여 줍니다.
+문장을 통째로 넣으면(예: *It just pays to be a little paranoid.*) 문장 번역과 함께 그 안의 숙어·관용 패턴(`it pays to ~` 등)을 모두 찾아 각각 풀이합니다.
+
+- 자주 쓰는 숙어 40개는 기본으로 들어 있어 바로 볼 수 있습니다. 그 밖의 숙어는 Claude가 풀이합니다(내 Claude 계정 사용량).
+- 최근 찾은 숙어는 그 기기의 브라우저에 저장됩니다.
+- 링크: https://claude.ai/artifact/HbtBoLmp8yRvJKZh39caMU
