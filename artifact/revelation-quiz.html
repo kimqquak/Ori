@@ -1,0 +1,380 @@
+<title>수료 종합 시험 퀴즈</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Pen+Script&display=swap">
+<style>
+/* Layout: one exam sheet at a time — question in ink, answer revealed in red pen, a ruled-paper card centered on a cool desk. */
+:root {
+  --desk: #e9edf3;
+  --paper: #fbfcfe;
+  --rule: #d5dde9;
+  --ink: #1e2a44;
+  --ink-soft: #5a6680;
+  --pen: #d0312d;
+  --pen-soft: #fbe4e2;
+  --ok: #1f7a4d;
+  --ok-soft: #dcf1e5;
+  --line: #c3cddd;
+  --f-display: "Gowun Batang", "Noto Serif KR", "AppleMyungjo", serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-pen: "Nanum Pen Script", "Gowun Batang", cursive;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #11151d; --paper: #1a202b; --rule: #283142; --ink: #e4e9f2; --ink-soft: #97a3b8;
+    --pen: #ff6b63; --pen-soft: #3a2224; --ok: #5fcf95; --ok-soft: #1c3329; --line: #36415a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #11151d; --paper: #1a202b; --rule: #283142; --ink: #e4e9f2; --ink-soft: #97a3b8;
+  --pen: #ff6b63; --pen-soft: #3a2224; --ok: #5fcf95; --ok-soft: #1c3329; --line: #36415a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--desk); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-direction: column; gap: 4px; }
+.verse { font-size: 12px; color: var(--ink-soft); letter-spacing: .02em; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(24px, 5vw, 32px); margin: 0; line-height: 1.25; text-wrap: balance; }
+h1 .omega { color: var(--pen); font-weight: 400; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--paper); }
+.seg button { border: 0; background: transparent; color: var(--ink-soft); font: 500 14px var(--f-body); padding: 7px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+select, .chk { font: 500 14px var(--f-body); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.chk input { accent-color: var(--pen); margin: 0; }
+button:focus-visible, select:focus-visible, textarea:focus-visible, .chk:focus-within { outline: 2px solid var(--pen); outline-offset: 2px; }
+
+.status { display: flex; gap: 14px; align-items: center; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.bar { flex: 1; height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--pen); width: 0; transition: width .3s; }
+.status b { color: var(--ink); font-weight: 600; }
+
+.sheet {
+  background: var(--paper);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 35px, var(--rule) 35px 36px);
+  background-position: 0 14px;
+  border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: 0 1px 0 var(--line), 0 10px 30px -18px rgba(20, 30, 60, .35);
+  padding: 22px clamp(16px, 4vw, 34px) 26px;
+  display: flex; flex-direction: column; gap: 18px; min-width: 0;
+}
+.qhead { display: flex; gap: 10px; align-items: baseline; }
+.qnum { font-family: var(--f-display); font-weight: 700; font-size: 22px; color: var(--pen); font-variant-numeric: tabular-nums; flex: none; }
+.qtext { font-family: var(--f-display); font-size: 18px; line-height: 1.75; min-width: 0; }
+.ask { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ask .label { font-weight: 600; font-size: 13px; letter-spacing: .04em; color: var(--paper); background: var(--ink); padding: 3px 10px; border-radius: 4px; }
+.ask .prompt { font-weight: 600; font-size: 17px; }
+
+.choices { display: grid; gap: 10px; }
+.choice {
+  display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 100%;
+  font: 400 15.5px/1.55 var(--f-body); color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.choice:hover:not(:disabled) { border-color: var(--ink); }
+.choice .k { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.choice span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.choice.right { border-color: var(--ok); background: var(--ok-soft); }
+.choice.right .k { background: var(--ok); border-color: var(--ok); color: var(--paper); }
+.choice.wrong { border-color: var(--pen); background: var(--pen-soft); }
+.choice.wrong .k { background: var(--pen); border-color: var(--pen); color: var(--paper); }
+.choice:disabled { cursor: default; }
+
+textarea {
+  width: 100%; min-height: 88px; resize: vertical; font: 400 16px/1.6 var(--f-body); color: var(--ink);
+  background: var(--paper); border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px;
+}
+.answer { display: flex; gap: 10px; align-items: baseline; border-top: 1px dashed var(--line); padding-top: 14px; }
+.answer .tag { font-weight: 600; font-size: 14px; color: var(--ink-soft); flex: none; }
+.answer .pen { font-family: var(--f-pen); color: var(--pen); font-size: 27px; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.btn { font: 600 15px var(--f-body); border-radius: 999px; padding: 10px 20px; cursor: pointer; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.ok { background: var(--ok); border-color: var(--ok); }
+.btn.no { background: var(--pen); border-color: var(--pen); }
+.hint { font-size: 12px; color: var(--ink-soft); text-align: right; }
+
+.result { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.score { font-family: var(--f-display); font-size: 64px; font-weight: 700; line-height: 1; color: var(--pen); font-variant-numeric: tabular-nums; }
+.score small { font-size: 22px; color: var(--ink-soft); }
+.grade { font-family: var(--f-pen); font-size: 34px; color: var(--pen); transform: rotate(-4deg); }
+.misses { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 10px; text-align: left; width: 100%; }
+.misses li { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; background: var(--paper); }
+.misses .m-q { font-size: 13px; color: var(--ink-soft); }
+.misses .m-a { font-family: var(--f-pen); color: var(--pen); font-size: 23px; line-height: 1.3; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="verse">✝ 이 예언의 말씀을 읽는 자와 듣는 자들과 그 가운데 기록한 것을 지키는 자들이 복이 있나니 때가 가까움이라 (계 1:3)</div>
+    <h1>시온기독교선교센터 수료 종합 시험 <span class="omega">퀴즈</span></h1>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="풀이 방식">
+      <button id="m-mc" aria-pressed="true">객관식</button>
+      <button id="m-card" aria-pressed="false">주관식 카드</button>
+    </div>
+    <select id="range" aria-label="문항 범위">
+      <option value="all">전체 40문항</option>
+      <option value="1-10">1–10번</option>
+      <option value="11-20">11–20번</option>
+      <option value="21-30">21–30번</option>
+      <option value="31-40">31–40번</option>
+      <option value="miss">지난번 틀린 것만</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="shuffle"> 섞기</label>
+  </div>
+
+  <div class="status">
+    <span id="pos">1 / 100</span>
+    <div class="bar"><i id="barfill"></i></div>
+    <span>정답 <b id="right">0</b></span>
+    <span>연속 <b id="streak">0</b></span>
+  </div>
+
+  <main class="sheet" id="sheet" aria-live="polite"></main>
+  <div class="hint" id="hint">키보드: 1–4 선택 · Enter 다음</div>
+</div>
+
+<script>
+const Q = [
+ [1,"나는 성경이 말씀한 누구인지, 관련 성경 장과 함께 쓰시오.",[["","나는 누구인가","나는 계시록 성취 때 하나님의 씨로 나서 추수되고 인 맞아 계 7장의 12지파에 소속된 계 14장의 첫 열매의 실체이다."]]],
+ [2,"내가 참으로 이 성경대로 창조되었다는 증거는 무엇인가?",[["","창조된 증거","추수되고 인 맞아 계 7장의 12지파에 소속된 것"]]],
+ [3,"성경에는 생명나무와 선악을 알게 하는 나무가 있다. 오늘날 ①생명나무 과실과 ②선악나무 과실은 무엇인지 각각 쓰시오.",[["①","생명나무 과실","계시록의 실상의 말씀"],["②","선악나무 과실","거짓 목자의 거짓 교리(주석)"]]],
+ [4,"하나님이 주시는 두 가지의 계시는 ①무엇이고, 그중 계시록 성취 때 하나님의 종들이 받아야 할 계시는 ②무엇이며, 이 계시가 ③전달되는 과정을 쓰시오.",[["①","두 가지의 계시","예언적 환상 계시, 실상 계시"],["②","종들이 받아야 할 계시","실상 계시"],["③","계시가 전달되는 과정","하나님 → 예수님 → 천사 → 새요한 → 종들"]]],
+ [5,"계 1:3에 ①'읽는 자'와 ②'듣는 자들'과 ③'지키는 자들'은 누구인지 각각 계시록의 해당 장(성구)과 함께 쓰시오.",[["①","읽는 자","열린 책을 받아먹은 새요한, 계 10장"],["②","듣는 자들","새요한에게 배우는 백성, 나라, 방언, 임금, 계 10:11"],["③","지키는 자들","새요한을 포함한 12지파 144,000과 흰 무리, 계 7장"]]],
+ [6,"계시록 성취는 ①누구의 출현으로 시작되는지 관련 성구와 함께 쓰고, 계시록이 성취되기 시작한 이 일은 ②언제, ③어디에서 실상으로 이루어졌는지 쓰시오.",[["①","누구의 출현 (성구)","재림 예수님, 계 1, 2, 3장"],["②","언제","1966년"],["③","어디에서","과천 소재 청계산 하(下) 장막성전"]]],
+ [7,"계 2~3장에 보낸 편지 내용은 ①몇 가지 무엇이며, 계 2~3장의 출현 인물 ②세 존재를 순차적으로 쓰고, 그들이 각자 ③한 일을 쓰시오.",[["①","편지 내용 몇 가지 무엇","세 가지: 본 것, 이제 있는 일, 장차 될 일"],["②","출현 인물 세 존재 (순서대로)","일곱 사자, 니골라당, 요한"],["③","일곱 사자가 한 일","길 예비 등불 역사"],["③","니골라당이 한 일","우상의 제물과 교훈, 행음"],["③","요한이 한 일","회개할 것과 약속의 말씀 편지"]]],
+ [8,"계시록의 3가지 비밀은 무엇인지 성구와 함께 기록하시오.",[["①","첫째 비밀","일곱 별과 일곱 금 촛대의 비밀, 계 1:20"],["②","둘째 비밀","음녀 바벨론과 일곱 머리와 열 뿔 가진 짐승의 비밀, 계 17:5~7"],["③","셋째 비밀","마지막 일곱째 나팔의 비밀, 계 10:7"]]],
+ [9,"이기는 자에게 주겠다고 계 2~3장에 약속한 ①복을 쓰고, 이것 외에 이기는 자가 받는 ②또 1가지 복을 증거 성구와 함께 쓰시오.",[["①","계 2~3장에 약속한 복","생명나무 과실, 생명의 면류관, 둘째 사망의 해를 면함, 감추었던 만나, 흰 돌, 철장, 새벽별, 흰옷 입음, 생명책 녹명, 하나님 성전의 기둥, 하나님과 거룩한 성 새 예루살렘의 이름과 예수님의 새 이름 기록, 예수님의 보좌에 앉게 해 줌"],["②","또 1가지 복 (성구)","유업을 받는 아들이 됨, 계 21:7"]]],
+ [10,"'하나님의 이름과 거룩한 성 새 예루살렘의 이름과 예수님의 새 이름을 이기는 자 위에 기록해 주겠다'는 것의 의미는 ①무엇이며, 예수님이 계 2~3장에 약속하신 복은 ②누가 받게 되는가?",[["①","이름을 기록해 주겠다는 의미","하나님과 천국과 예수님이 이긴자에게 오심"],["②","복을 받는 자","사단 니골라당과 싸워 이기는 자"]]],
+ [11,"계 4:8에서 하나님의 보좌가 장차 이 땅에 임해 오신다고 했다. 하나님의 보좌는 계시록 ①몇 장의 어디에 오시며, 그곳의 실체는 ②어디인가?",[["①","몇 장의 어디","계 14장의 12지파 인 맞은 144,000이 있는 시온산"],["②","그곳의 실체","신천지예수교 증거장막성전"]]],
+ [12,"계 5장에서 하나님의 오른손에 있는 '일곱 인으로 봉한 책'은 요한계시록이다. 그동안 봉한 책의 내용을 천상천하 아무도 몰랐던 이유는 ①무엇이고, 봉한 책의 내용은 ②무엇인가?",[["①","아무도 몰랐던 이유","실상이 나타나지 않았기 때문"],["②","봉한 책의 내용","이루어야 할 하나님의 비밀"]]],
+ [13,"눅 22:14~20에 새 언약으로 약속하신 '예수님의 피와 살'은 ①언제, ②어디에서, ③누가 먹게 되는지 증거 성구 3개와 함께 쓰시오.",[["①","언제","계시록 성취 때"],["②","어디에서","하나님의 나라 계 7장의 신천지 12지파"],["③","누가 (성구 3개)","144,000과 흰 무리, 계 1:5~6, 계 5:9~10, 계 7:9~14"]]],
+ [14,"계 6장은 ①누가, 누구를 들어, ②누구를 심판한 것이며, 계 6장에서 쫓겨난 자들은 ③몇 장, 몇 장에서 죽임을 당하는가?",[["①","누가, 누구를 들어","예수님, 네 생물"],["②","누구를 심판","배도한 선민(일곱 사자와 장막 성도들)"],["③","죽임을 당하는 장","계 8장, 계 9장"]]],
+ [15,"마 8장의 바깥 어두운 데로 쫓겨나는 ①'나라의 본 자손들'과 ②'동서로부터 와서 천국에 앉는 자들'은 누구인지 각각 관련 성경 장과 함께 쓰시오.",[["①","나라의 본 자손들","부패한 전통 교회(영적 이스라엘), 계 6장(계 13장)"],["②","동서로부터 와서 천국에 앉는 자들","추수되어 인 맞은 신천지 12지파(영적 새 이스라엘), 계 7장(계 14장)"]]],
+ [16,"계 7장의 인 맞은 자들은 ①무슨 일 후, ②어디서 어떻게 온 자들이며, 이들의 실체는 ③누구인가?",[["①","무슨 일 후","계 6장의 배도한 선천 해·달·별에 대한 심판 후"],["②","어디서 어떻게","추수 밭에서 추수되어"],["③","이들의 실체","신천지 12지파 144,000"]]],
+ [17,"계 8장에서 나팔 소리가 나는 이유는 ①무엇인가? 또한 계 8~9장에서 죽임을 당한 자들은 ②누구이며, 1~6번째 나팔 소리와 일곱 번째 나팔 소리는 ③무엇이 다른가?",[["①","나팔 소리가 나는 이유","인을 다 뗌으로 책이 열려 읽으므로"],["②","죽임을 당한 자들","계 6장에서 쫓겨난 자들"],["③","1~6번째 나팔","배도자들의 죽음"],["③","일곱 번째 나팔","구원의 나팔"]]],
+ [18,"계시록에서 이방 짐승(멸망자)이 선민 장막을 심판하는 성경 장 3개는 ①무엇이며, 일곱 천사가 받은 일곱 나팔의 실체는 ②무엇인지 성경 장과 함께 쓰시오.",[["①","선민 장막을 심판하는 장 3개","계 8장, 계 9장, 계 13장"],["②","일곱 나팔의 실체","심판 때 믿음의 씨로 빼낸 성도들, 계 6장"]]],
+ [19,"계 9장과 계 19장의 '탄 자와 말'은 각각 ①어느 소속의 어떤 존재이며, 계 9장에서 출현한 말의 ②'머리'와 ③'꼬리', 그 말 입에서 나오는 ④'불, 연기, 유황'은 무엇인가?",[["①","계 9장의 탄 자와 말","마귀 소속 영·육"],["①","계 19장의 탄 자와 말","하나님 소속 영·육"],["②","말의 머리","용의 일곱 목자"],["③","말의 꼬리","거짓 선지자"],["④","불, 연기, 유황","거짓 교리와 교법"]]],
+ [20,"계 9:15을 본바, 여섯째 나팔의 재앙에서 범죄한 네 천사에게 '죽임을 당하는 사람'은 ①누구이며, 죽임을 당하는 '그 연(年), 월, 일, 시'의 실상은 ②언제, 어떤 사건인가?",[["①","죽임을 당하는 사람","배도한 장막성전 사람들"],["②","그 연·월·일·시의 실상","1981년 9월 20일 14시, 목사 임직식"]]],
+ [21,"계 10장에서 요한이 '열린 책을 받아먹었다'는 것은 무슨 뜻인가?",[["","받아먹었다는 뜻","계시록의 참뜻과 실상을 완전히 깨달아 통달하고 마음에 인 맞아 있는 것"]]],
+ [22,"초림 때 '구약이 성취된 계시'는 ①누가 받아먹고 어디에 증거했는지 증거 성구와 함께 쓰고, 재림 때 '신약이 성취된 계시'는 ②누가 받아먹고 어디에 증거하는지 증거 성구와 함께 쓰시오. 또한 계 1:2에 본바, 지시받은 한 사람이 하나님의 말씀을 전했다고 했는데, 그가 전한 이 말씀은 계시록 ③몇 장에서 받은 말씀인지 쓰시오.",[["①","초림: 누가, 어디에 (성구)","예수님, 패역한 이스라엘, 겔 3장, 마 15:24"],["②","재림: 누가, 어디에 (성구)","새요한, 죄 가운데 있는 교회들, 계 10장, 계 22:8, 16"],["③","몇 장에서 받은 말씀","계 10장"]]],
+ [23,"일곱째 나팔의 실체는 ①누구이며, 일곱째 나팔 소리는 ②무엇인가? 또한 신·구약 성경에 '일곱째 나팔'이 나오는 성구 4개는 ③무엇인가?",[["①","일곱째 나팔의 실체","약속의 목자 새요한"],["②","일곱째 나팔 소리","새요한의 계시 증거"],["③","'일곱째 나팔' 성구 4개","수 6:15~16, 고전 15:51~54, 계 10:7, 계 11:15"]]],
+ [24,"'일곱째 나팔이 불릴 때 있는 일'은 ①무엇인지 쓰고, '마지막 나팔의 비밀'은 ②무엇인지 관련 성구 2개와 함께 쓰시오.",[["①","일곱째 나팔이 불릴 때 있는 일","세상 나라가 하나님의 나라가 됨"],["②","마지막 나팔의 비밀 (성구 2개)","부활과 영생 곧 새 피조물로 변화, 계 10:7, 고전 15:51~54"]]],
+ [25,"계 12:9~11에 아이와 그 형제들이 용의 무리와 싸워 이긴 무기인 ①'어린양의 피'와 ②'증거하는 말'은 무엇이며, 하나님의 나라와 구원은 ③무슨 일 후 있게 되는가? 또한 계 2~3장의 약속은 ④몇 장에서 이루어졌는가?",[["①","어린양의 피","예수님의 생명의 말씀"],["②","증거하는 말","계시록 성취 실상 증거의 말씀"],["③","무슨 일 후","용의 무리와 싸워 이긴 후"],["④","계 2~3장의 약속이 이루어진 장","계 12장"]]],
+ [26,"계 13장의 사건의 현장인 '하늘'은 ①어디이며, 계 13장의 '일곱 머리와 열 뿔'은 계시록 ②몇 장의 누구인가?",[["①","'하늘'은 어디","계 2~3장과 동일한 장막성전"],["②","일곱 머리와 열 뿔","계 17장의 바벨론 일곱 목자와 열 명의 권세자"]]],
+ [27,"계 14:3의 '새 노래'는 ①무엇이며, 온 세상에서 ②누구만이 부르며, 새 노래를 배운 곳의 실상은 ③어디인가?",[["①","새 노래","계시록이 성취된 실상의 말씀"],["②","누구만이 부르는가","12지파 인 맞은 144,000"],["③","새 노래를 배운 곳","보좌 앞 시온기독교선교센터"]]],
+ [28,"마 13장을 본바, '하나님의 씨로 난 자'와 '마귀의 씨로 난 자'는 ①무엇으로 알 수 있는가? 또한 각각의 실체와 결과는 ②무엇인가?",[["①","무엇으로 알 수 있는가","추수된 자와 추수되지 못한 자"],["②","하나님 씨로 난 자의 실체와 결과","추수되고 인 맞아 12지파에 등록된 자, 천국과 영생"],["②","마귀 씨로 난 자의 실체와 결과","추수되지도 인 맞지도 못하여 12지파에 등록되지 못한 자, 지옥과 영벌"]]],
+ [29,"계 15:2의 '이기고 벗어난 자들'은 ①누구인지 관련 성경 장과 함께 쓰고, 이긴 무기는 ②무엇인지 증거 성구 1개와 함께 쓰시오.",[["①","이기고 벗어난 자들","용의 무리와 싸워 이긴 자들, 계 12장"],["②","이긴 무기 (성구)","어린양의 피와 증거하는 말, 계 12:11"]]],
+ [30,"계 15:5의 '증거장막 성전'에서는 ①누가, ②무엇을 증거하며, 이들만이 증거할 수 있는 이유 2가지는 ③무엇인가?",[["①","누가 증거하는가","이긴 자들"],["②","무엇을 증거하는가","계시록 전장의 실체"],["③","이들만 증거할 수 있는 이유 2가지","사건의 현장에서 실체들을 보았고, 멸망자와 싸워 이겼기 때문"]]],
+ [31,"계시록의 '재앙'은 ①몇 가지이며 무엇인지 순서대로 쓰고, '계 6장'과 '계 16장'의 심판의 ②대상은 어떻게 다른지 쓰시오.",[["①","재앙 몇 가지, 순서대로","세 가지, 일곱 인, 일곱 나팔, 일곱 대접"],["②","계 6장 심판의 대상","배도자들"],["②","계 16장 심판의 대상","배도자들과 멸망자들"]]],
+ [32,"계 16장의 일곱 금 대접은 계시록의 어디서 나타난 존재인지 ①2개의 장을 쓰고, 대접에서 쏟아지는 것은 ②무엇이며, 대접이 쏟아지는 곳은 ③몇 장의 어디인지 쓰시오.",[["①","대접이 나타난 2개의 장","계 12장, 계 15장"],["②","대접에서 쏟아지는 것","하나님의 진노"],["③","대접이 쏟아지는 곳","계 13장 장막과 계 18장 바벨론"]]],
+ [33,"계시록에서 ①예수님이 택한 목자가 주는 양식과 ②마귀가 택한 목자가 주는 양식은 무엇인지 각각 관련 성구와 함께 쓰시오.",[["①","예수님이 택한 목자가 주는 양식","계 2:17 감추었던 만나, 계 10장 계시 말씀, 계 22장 생명나무 과실"],["②","마귀가 택한 목자가 주는 양식","계 17:2, 계 18:3 음행의 포도주"]]],
+ [34,"'음행의 포도주'는 ①무엇이며, 계 18장에 본바 무너진 만국과 음행의 포도주를 먹은 자들은 ②누구와 결혼했으며, 결혼하는 신랑과 신부는 ③누구인가?",[["①","음행의 포도주","거짓 교리(선악과)"],["②","누구와 결혼했는가","용의 신 사단"],["③","신랑과 신부","사단과 그 소속 교인들"]]],
+ [35,"하나님께서 아직 바벨론을 심판하지 않으시는 이유는 ①무엇인지 관련 성구 1개와 함께 쓰고, 이 심판은 ②누가, ③무엇으로 하는 심판인지 쓰시오.",[["①","아직 심판하지 않으시는 이유 (성구)","계 18:4, 하나님의 백성이 다 나오지 않았기 때문"],["②","누가 하는 심판","하나님"],["③","무엇으로 하는 심판","불"]]],
+ [36,"계 19장은 ①어떤 일 후 있게 되며, 계 19장에서 이루어지는 일 2가지는 ②무엇인가?",[["①","어떤 일 후","계 18장의 바벨론 심판 후"],["②","이루어지는 일 2가지","영육 결혼, 하나님이 오사 통치하심"]]],
+ [37,"계 20장, 용이 잡힌 후 보좌들 위에 앉아 심판하는 권세자들은 ①누구이며, 그리스도로 더불어 왕 노릇 하는 첫째 부활에 참예할 자는 ②누구이며, 천 년 후 심판받는 자들은 ③어떤 자들인가?",[["①","보좌에 앉아 심판하는 권세자들","예수님의 영·육 12제자들"],["②","첫째 부활에 참예할 자","순교의 영들과 짐승의 표를 받지 아니하고 하나님의 인 맞은 살아남은 자들"],["③","천 년 후 심판받는 자들","곡과 마곡, 육이 죽은 영들"]]],
+ [38,"'계시록 성취 시작'은 ①몇 장의 무슨 일이며, '계시록의 완성'은 ②몇 장의 무슨 일인가?",[["①","계시록 성취 시작","계 1, 2, 3장, 재림 예수님 출현"],["②","계시록의 완성","계 21장의 하나님과 천국이 신천지에 임함"]]],
+ [39,"성경 66권 중 가장 중대한 예언은 ①무엇이며, 그중에서도 ②몇 장의 내용이 가장 중대하고, 그 이유는 ③무엇인가?",[["①","가장 중대한 예언","요한계시록"],["②","가장 중대한 장","계 21장"],["③","그 이유","하나님의 목적인 새 하늘 새 땅 창조에 대한 약속이기 때문"]]],
+ [40,"주 재림 때 계시록이 가장 중요한 ①이유와 증거 성구를 쓰고, '최고의 진리'는 ②무엇이며, ③어디에 있는지 쓰시오.",[["①","가장 중요한 이유 (성구)","가감하면 천국에 못 가기 때문, 계 22:18~19"],["②","최고의 진리","계 1장부터 계 22장까지"],["③","최고의 진리가 있는 곳","진리의 성읍 신천지"]]]
+];
+
+// Flatten to cards
+const CARDS = [];
+Q.forEach(([n, q, subs]) => subs.forEach(([l, p, a], i) => CARDS.push({ id: n + "-" + i, n, q, l, p, a })));
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const shuffleArr = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const hasRef = s => /(계|마|눅|겔|수|고전)\s?\d/.test(s);
+
+let S = null;
+
+function pickChoices(card) {
+  const others = [...new Set(CARDS.filter(c => c.a !== card.a).map(c => c.a))];
+  const sib = new Set(CARDS.filter(c => c.n === card.n && c.a !== card.a).map(c => c.a));
+  const scored = others.map(a => ({
+    a,
+    s: Math.abs(a.length - card.a.length) / Math.max(card.a.length, 8) * 10
+       + (hasRef(a) !== hasRef(card.a) ? 6 : 0)
+       - (sib.has(a) ? 3 : 0)
+       + Math.random() * 4
+  })).sort((x, y) => x.s - y.s);
+  const pool = shuffleArr(scored.slice(0, 7)).slice(0, 3).map(x => x.a);
+  return shuffleArr([card.a, ...pool]);
+}
+
+function buildDeck() {
+  const r = $("range").value;
+  let deck = CARDS;
+  if (r === "miss") {
+    const miss = new Set(store.get("rq-miss", []));
+    deck = CARDS.filter(c => miss.has(c.id));
+  } else if (r !== "all") {
+    const [lo, hi] = r.split("-").map(Number);
+    deck = CARDS.filter(c => c.n >= lo && c.n <= hi);
+  }
+  if ($("shuffle").checked) deck = shuffleArr(deck);
+  return deck.map(c => c.id);
+}
+
+function start(data) {
+  if (data && data.S) { S = data.S; syncControls(); render(); return; }
+  newGame();
+}
+function newGame(deckIds) {
+  const deck = deckIds || buildDeck();
+  S = { mode: S ? S.mode : "mc", deck, i: 0, right: 0, streak: 0, best: 0, misses: [], answered: null, choices: null, revealed: false, draft: "" };
+  render();
+}
+function syncControls() {
+  $("m-mc").setAttribute("aria-pressed", S.mode === "mc");
+  $("m-card").setAttribute("aria-pressed", S.mode === "card");
+}
+
+function cardAt(i) { const id = S.deck[i]; return CARDS.find(c => c.id === id); }
+
+function markQuestion(q, label) {
+  if (!label) return esc(q);
+  return esc(q).replace(label, `<mark style="background:var(--pen-soft);color:var(--pen);font-weight:700;padding:0 2px;border-radius:3px">${label}</mark>`);
+}
+
+function renderStatus() {
+  const total = S.deck.length;
+  const done = Math.min(S.i + (S.answered !== null || S.revealed ? 1 : 0), total);
+  $("pos").textContent = total ? `${Math.min(S.i + 1, total)} / ${total}` : "0 / 0";
+  $("barfill").style.width = total ? (done / total * 100) + "%" : "0";
+  $("right").textContent = S.right;
+  $("streak").textContent = S.streak;
+}
+
+function render() {
+  syncControls();
+  renderStatus();
+  const sheet = $("sheet");
+  if (!S.deck.length) {
+    sheet.innerHTML = `<div class="result"><div class="grade">틀린 문제가 없습니다</div><p>지난번에 틀린 문항이 저장되어 있지 않아요. 다른 범위를 골라 풀어 보세요.</p></div>`;
+    $("hint").hidden = true;
+    return;
+  }
+  if (S.i >= S.deck.length) return renderResult();
+  $("hint").hidden = false;
+  const c = cardAt(S.i);
+  let html = `
+    <div class="qhead"><span class="qnum">${c.n}.</span><div class="qtext">${markQuestion(c.q, c.l)}</div></div>
+    <div class="ask"><span class="label">${c.l ? "문항 " + c.l : "답"}</span><span class="prompt">${esc(c.p)}</span></div>`;
+  if (S.mode === "mc") {
+    if (!S.choices) S.choices = pickChoices(c);
+    html += `<div class="choices">` + S.choices.map((a, k) => {
+      let cls = "";
+      if (S.answered !== null) { if (a === c.a) cls = "right"; else if (k === S.answered) cls = "wrong"; }
+      return `<button class="choice ${cls}" data-k="${k}" ${S.answered !== null ? "disabled" : ""}><span class="k">${k + 1}</span><span>${esc(a)}</span></button>`;
+    }).join("") + `</div>`;
+    if (S.answered !== null) html += `<div class="actions"><button class="btn" id="next">${S.i + 1 < S.deck.length ? "다음 문제" : "결과 보기"}</button></div>`;
+    $("hint").textContent = "키보드: 1–4 선택 · Enter 다음";
+  } else {
+    html += `<textarea id="draft" placeholder="생각나는 답을 적어 보세요 (선택)">${esc(S.draft)}</textarea>`;
+    if (S.revealed) {
+      html += `<div class="answer"><span class="tag">답&gt;</span><span class="pen">${esc(c.a)}</span></div>
+        <div class="actions"><button class="btn no" id="miss">틀렸어요</button><button class="btn ok" id="got">맞았어요</button></div>`;
+    } else {
+      html += `<div class="actions"><button class="btn" id="reveal">정답 보기</button></div>`;
+    }
+    $("hint").textContent = "키보드: Ctrl+Enter 정답 보기 · O 맞음 · X 틀림";
+  }
+  sheet.innerHTML = html;
+  sheet.querySelectorAll(".choice").forEach(b => b.onclick = () => choose(+b.dataset.k));
+  const nx = $("next"); if (nx) { nx.onclick = next; nx.focus(); }
+  const rv = $("reveal"); if (rv) rv.onclick = reveal;
+  const g = $("got"); if (g) g.onclick = () => grade(true);
+  const m = $("miss"); if (m) m.onclick = () => grade(false);
+  const d = $("draft"); if (d) d.oninput = () => { S.draft = d.value; };
+}
+
+function record(ok) {
+  const c = cardAt(S.i);
+  if (ok) { S.right++; S.streak++; S.best = Math.max(S.best, S.streak); }
+  else { S.streak = 0; S.misses.push(c.id); }
+}
+function choose(k) {
+  if (S.answered !== null) return;
+  S.answered = k;
+  record(S.choices[k] === cardAt(S.i).a);
+  render();
+}
+function reveal() { S.revealed = true; render(); }
+function grade(ok) { record(ok); next(); }
+function next() {
+  S.i++; S.answered = null; S.choices = null; S.revealed = false; S.draft = "";
+  if (S.i >= S.deck.length) saveMisses();
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function saveMisses() {
+  const prev = new Set(store.get("rq-miss", []));
+  S.deck.forEach(id => prev.delete(id));
+  S.misses.forEach(id => prev.add(id));
+  store.set("rq-miss", [...prev]);
+}
+
+function renderResult() {
+  $("hint").hidden = true;
+  const total = S.deck.length, pct = Math.round(S.right / total * 100);
+  const grade = pct === 100 ? "만점!" : pct >= 90 ? "아주 잘했어요" : pct >= 70 ? "조금만 더" : "다시 한 번";
+  const misses = S.misses.map(id => CARDS.find(c => c.id === id));
+  $("sheet").innerHTML = `
+    <div class="result">
+      <div class="grade">${grade}</div>
+      <div class="score">${S.right}<small> / ${total}</small></div>
+      <div style="color:var(--ink-soft);font-size:14px">정답률 ${pct}% · 최고 연속 ${S.best}문항</div>
+      <div class="actions" style="justify-content:center">
+        ${misses.length ? `<button class="btn no" id="retry">틀린 ${misses.length}문항 다시 풀기</button>` : ""}
+        <button class="btn ghost" id="again">처음부터 다시</button>
+      </div>
+      ${misses.length ? `<ul class="misses">${misses.map(c => `<li><div class="m-q">${c.n}번 ${c.l} · ${esc(c.p)}</div><div class="m-a">${esc(c.a)}</div></li>`).join("")}</ul>` : ""}
+    </div>`;
+  const r = $("retry"); if (r) r.onclick = () => newGame(shuffleArr(S.misses));
+  $("again").onclick = () => newGame();
+}
+
+$("m-mc").onclick = () => { S.mode = "mc"; S.answered = null; S.revealed = false; render(); };
+$("m-card").onclick = () => { S.mode = "card"; S.answered = null; S.revealed = false; render(); };
+$("range").onchange = () => newGame();
+$("shuffle").onchange = () => newGame();
+
+document.addEventListener("keydown", e => {
+  if (!S || S.i >= S.deck.length) return;
+  const typing = e.target.tagName === "TEXTAREA";
+  if (S.mode === "mc") {
+    if (S.answered === null && /^[1-4]$/.test(e.key)) choose(+e.key - 1);
+    else if (S.answered !== null && e.key === "Enter" && e.target.id !== "next") { e.preventDefault(); next(); }
+  } else {
+    if (!S.revealed && e.key === "Enter" && (e.ctrlKey || e.metaKey || !typing)) { e.preventDefault(); reveal(); }
+    else if (S.revealed && !typing && (e.key === "o" || e.key === "O")) grade(true);
+    else if (S.revealed && !typing && (e.key === "x" || e.key === "X")) grade(false);
+  }
+});
+
+window.claude?.hot?.snapshot?.(() => ({ S }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
