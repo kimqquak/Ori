@@ -83,10 +83,12 @@ textarea {
 .verdict.is-ok .mark, .verdict.is-ok b { color: var(--ok); }
 .verdict.is-no .mark, .verdict.is-no b { color: var(--pen); }
 .meter { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.keys { display: flex; flex-wrap: wrap; gap: 6px; }
-.key { font-size: 13.5px; padding: 2px 10px; border-radius: 999px; border: 1px solid; }
-.key.hit { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
-.key.miss { color: var(--pen); border-color: var(--pen); border-style: dashed; }
+.diff { display: flex; gap: 10px; align-items: baseline; }
+.diff-label { font-weight: 600; font-size: 14px; color: var(--ink-soft); flex: none; }
+.diff-text { font-size: 16px; line-height: 1.8; min-width: 0; overflow-wrap: anywhere; }
+.diff ins, .legend ins { text-decoration: none; color: var(--pen); background: var(--pen-soft); border-bottom: 2px solid var(--pen); padding: 0 1px; }
+.diff del, .legend del { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--pen); }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-soft); }
 textarea[readonly] { border-style: solid; color: var(--ink-soft); }
 .answer { display: flex; gap: 10px; align-items: baseline; border-top: 1px dashed var(--line); padding-top: 14px; }
 .answer .tag { font-weight: 600; font-size: 14px; color: var(--ink-soft); flex: none; }
@@ -136,7 +138,7 @@ textarea[readonly] { border-style: solid; color: var(--ink-soft); }
   </div>
 
   <main class="sheet" id="sheet" aria-live="polite"></main>
-  <div class="hint" id="hint">Ctrl+Enter 채점 · O 맞음 · X 틀림 · 핵심어 70% 이상이면 자동 채점 정답</div>
+  <div class="hint" id="hint">Ctrl+Enter 채점 · O 맞음 · X 틀림 · 정답과 똑같아야 정답 (띄어쓰기 무시)</div>
 </div>
 
 <script>
@@ -198,49 +200,33 @@ const shuffleArr = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) 
 let S = null;
 
 // ---------- 자동 채점 ----------
-// 정답을 핵심어로 쪼갠 뒤, 입력한 답에 각 핵심어가 들어 있는지 확인한다.
-const STOP = new Set(["것", "때", "곧", "및", "등", "그", "더", "때문", "계", "장", "할", "있는", "된", "한", "되는", "하는"]);
-const SUFFIX = ["에서", "으로", "부터", "까지", "들의", "들과", "들은", "들을", "들이", "들", "의", "과", "와", "을", "를", "은", "는", "에", "로", "도", "이", "가"];
-const norm = s => s.replace(/[-–—]/g, "~").replace(/[\s.,·:;'"‘’“”()（）\[\]<>→\/]/g, "").toLowerCase();
+// 정답과 글자 하나까지 같아야 정답. 띄어쓰기와 줄바꿈만 무시한다.
+const squash = s => s.replace(/\s+/g, "");
 
-function keywords(answer) {
+// 글자 단위 비교(LCS): 정답에서 빠진 글자와 내가 더 쓴 글자를 표시한다.
+function diff(answer, input) {
+  const A = [...squash(answer)], B = [...squash(input)];
+  const n = A.length, m = B.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
   const out = [];
-  answer
-    .replace(/(계|마|눅|겔|수|고전)\s?(\d+:\d+(?:~\d+)?)/g, "$2")       // "계 10:11" → "10:11"
-    .split(/[\s,\n·()→:]+(?![\d])|[\s,\n·()→]+/)
-    .forEach(raw => {
-      let t = raw.replace(/[.'"‘’“”]/g, "").trim();
-      if (!t) return;
-      if (/\d/.test(t)) {                                              // 숫자·성구: 숫자 부분만 정확히
-        t = t.replace(/[^\d:~,]/g, "").replace(/-/g, "~");
-        if (t) out.push({ t: raw.trim(), stem: norm(t), num: true });
-        return;
-      }
-      if (STOP.has(t)) return;
-      let base = t;
-      for (const sfx of SUFFIX) {
-        const keep = (sfx === "들" || sfx === "의") ? 1 : 2;            // "종들" → "종", "국가"는 그대로
-        if (base.length >= sfx.length + keep && base.endsWith(sfx)) { base = base.slice(0, -sfx.length); break; }
-      }
-      if (STOP.has(base)) return;
-      const L = base.length;
-      const stem = L >= 4 ? base.slice(0, L - 2)
-        : L === 3 ? base.slice(0, 2)
-        : L === 2 && "지고아어게며서".includes(base[1]) ? base[0]            // "받지" → "받", "맞아" → "맞"
-        : base;
-      out.push({ t: raw.trim(), stem: norm(stem), num: false });
-    });
-  const seen = new Set();
-  return out.filter(k => k.stem && !seen.has(k.stem) && seen.add(k.stem));
+  let i = 0, j = 0;
+  const push = (t, ch) => { const last = out[out.length - 1]; if (last && last.t === t) last.s += ch; else out.push({ t, s: ch }); };
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { push("same", A[i]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { push("miss", A[i]); i++; }
+    else { push("extra", B[j]); j++; }
+  }
+  while (i < n) push("miss", A[i++]);
+  while (j < m) push("extra", B[j++]);
+  return out;
 }
 
 function autoGrade(answer, input) {
-  const keys = keywords(answer);
-  const u = norm(input);
-  const hits = keys.map(k => ({ t: k.t, hit: u.length > 0 && u.includes(k.stem) }));
-  const n = hits.filter(h => h.hit).length;
-  const pct = keys.length ? Math.round(n / keys.length * 100) : 0;
-  return { hits, pct, ok: pct >= 70 };
+  const ok = squash(input).length > 0 && squash(input) === squash(answer);
+  return { ok, parts: ok ? [] : diff(answer, input), empty: !squash(input) };
 }
 
 function buildDeck() {
@@ -303,9 +289,10 @@ function render() {
     html += `
       <div class="verdict ${g.ok ? "is-ok" : "is-no"}">
         <span class="mark">${g.ok ? "○" : "✕"}</span>
-        <div><b>자동 채점: ${g.ok ? "정답" : "오답"}</b><div class="meter">핵심어 ${g.hits.filter(h => h.hit).length} / ${g.hits.length} 일치 · ${g.pct}% · 아래 버튼으로 최종 판정하세요</div></div>
+        <div><b>자동 채점: ${g.ok ? "정답" : "오답"}</b><div class="meter">${g.ok ? "정답과 똑같이 썼어요" : g.empty ? "답을 쓰지 않았어요" : "정답과 다른 곳이 있어요"} · 아래 버튼으로 최종 판정하세요</div></div>
       </div>
-      <div class="keys">${g.hits.map(h => `<span class="key ${h.hit ? "hit" : "miss"}">${esc(h.t)}</span>`).join("")}</div>
+      ${!g.ok && !g.empty ? `<div class="diff"><span class="diff-label">비교</span><span class="diff-text">${g.parts.map(p => p.t === "same" ? esc(p.s) : `<${p.t === "miss" ? "ins" : "del"}>${esc(p.s)}</${p.t === "miss" ? "ins" : "del"}>`).join("")}</span></div>
+      <div class="legend"><ins>빠진 글자</ins><del>더 쓴 글자</del></div>` : ""}
       <div class="answer"><span class="tag">답&gt;</span><span class="pen">${esc(c.a)}</span></div>
       <div class="actions">
         <button class="btn ${g.ok ? "ghost" : "no"}" id="judge-no">✕ 틀림</button>
