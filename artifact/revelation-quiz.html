@@ -136,7 +136,7 @@ textarea[readonly] { border-style: solid; color: var(--ink-soft); }
   </div>
 
   <main class="sheet" id="sheet" aria-live="polite"></main>
-  <div class="hint" id="hint">Ctrl+Enter 채점 · Enter 다음 문제 · 핵심어의 70% 이상을 쓰면 정답</div>
+  <div class="hint" id="hint">Ctrl+Enter 채점 · O 맞음 · X 틀림 · 핵심어 70% 이상이면 자동 채점 정답</div>
 </div>
 
 <script>
@@ -303,13 +303,13 @@ function render() {
     html += `
       <div class="verdict ${g.ok ? "is-ok" : "is-no"}">
         <span class="mark">${g.ok ? "○" : "✕"}</span>
-        <div><b>${g.ok ? "정답" : "오답"}</b>${g.overridden ? " (정답으로 인정)" : ""}<div class="meter">핵심어 ${g.hits.filter(h => h.hit).length} / ${g.hits.length} 일치 · ${g.pct}%</div></div>
+        <div><b>자동 채점: ${g.ok ? "정답" : "오답"}</b><div class="meter">핵심어 ${g.hits.filter(h => h.hit).length} / ${g.hits.length} 일치 · ${g.pct}% · 아래 버튼으로 최종 판정하세요</div></div>
       </div>
       <div class="keys">${g.hits.map(h => `<span class="key ${h.hit ? "hit" : "miss"}">${esc(h.t)}</span>`).join("")}</div>
       <div class="answer"><span class="tag">답&gt;</span><span class="pen">${esc(c.a)}</span></div>
       <div class="actions">
-        ${!g.ok ? `<button class="btn ghost" id="accept">정답으로 인정</button>` : ""}
-        <button class="btn" id="next">${S.i + 1 < S.deck.length ? "다음 문제" : "결과 보기"}</button>
+        <button class="btn ${g.ok ? "ghost" : "no"}" id="judge-no">✕ 틀림</button>
+        <button class="btn ${g.ok ? "ok" : "ghost"}" id="judge-ok">○ 맞음</button>
       </div>`;
   } else {
     html += `<div class="actions"><button class="btn ghost" id="skip">모르겠어요</button><button class="btn" id="check">채점하기</button></div>`;
@@ -319,25 +319,26 @@ function render() {
   d.oninput = () => { S.draft = d.value; };
   const ck = $("check"); if (ck) ck.onclick = check;
   const sk = $("skip"); if (sk) sk.onclick = () => { S.draft = ""; check(); };
-  const ac = $("accept"); if (ac) ac.onclick = accept;
-  const nx = $("next"); if (nx) { nx.onclick = next; nx.focus({ preventScroll: true }); }
-  else d.focus({ preventScroll: true });
+  const jo = $("judge-ok"), jn = $("judge-no");
+  if (jo) {
+    jo.onclick = () => decide(true);
+    jn.onclick = () => decide(false);
+    (g.ok ? jo : jn).focus({ preventScroll: true });
+  } else d.focus({ preventScroll: true });
 }
 
 function check() {
   if (S.graded) return;
   const c = cardAt(S.i);
   S.graded = autoGrade(c.a, S.draft);
-  if (S.graded.ok) { S.right++; S.streak++; S.best = Math.max(S.best, S.streak); }
-  else { S.streak = 0; S.misses.push(c.id); }
   render();
 }
-function accept() {
+function decide(ok) {
+  if (!S.graded) return;
   const c = cardAt(S.i);
-  S.graded.ok = true; S.graded.overridden = true;
-  S.misses = S.misses.filter(id => id !== c.id);
-  S.right++; S.streak++; S.best = Math.max(S.best, S.streak);
-  render();
+  if (ok) { S.right++; S.streak++; S.best = Math.max(S.best, S.streak); }
+  else { S.streak = 0; S.misses.push(c.id); }
+  next();
 }
 function next() {
   S.i++; S.graded = null; S.draft = "";
@@ -377,10 +378,11 @@ $("shuffle").onchange = () => newGame();
 
 document.addEventListener("keydown", e => {
   if (!S || S.i >= S.deck.length) return;
-  if (e.key !== "Enter") return;
-  const typing = e.target.tagName === "TEXTAREA";
-  if (!S.graded && (e.ctrlKey || e.metaKey || !typing)) { e.preventDefault(); check(); }
-  else if (S.graded && e.target.id !== "next" && e.target.id !== "accept") { e.preventDefault(); next(); }
+  const typing = e.target.tagName === "TEXTAREA" && !S.graded;
+  if (!S.graded) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey || !typing)) { e.preventDefault(); check(); }
+  } else if (e.key === "o" || e.key === "O") decide(true);
+  else if (e.key === "x" || e.key === "X") decide(false);
 });
 
 window.claude?.hot?.snapshot?.(() => ({ S }));
